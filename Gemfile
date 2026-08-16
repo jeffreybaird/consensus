@@ -14,6 +14,7 @@ gem "sqlite3", "~> 2.6"                          # the only DB backend
 gem "rake", "~> 13.2"                            # `rake db:migrate` (the deploy gate)
 gem "dry-monads", "~> 1.8", require: "dry/monads" # Success/Failure Results
 gem "faraday", "~> 2.13"                         # HTTP client for service wrappers
+gem "biometry", path: "../rei_calc"              # fetal biometry: dating, EFW, growth charts
 
 group :development, :test do
   gem "rspec", "~> 3.13"
