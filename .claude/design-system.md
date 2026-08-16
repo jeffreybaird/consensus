@@ -1,8 +1,10 @@
 # Design System
 
-> Template — fill in with your project's design tokens, components, and tone. Replace every `<placeholder>` and the `Consensus` / `consensus` names.
+> Filled in for Consensus — the "Reading room" direction, 2026-08-16. Token
+> values are validator-checked; change them only with a re-run of the dataviz
+> palette validator against both surfaces.
 
-This file is the authoritative reference for all frontend work on `<project name>`. Read it before writing any template, partial, view, or CSS. Follow conventions already established in the codebase — discover before building.
+This file is the authoritative reference for all frontend work on Consensus. Read it before writing any template, partial, view, or CSS. Follow conventions already established in the codebase — discover before building.
 
 > **Baseline:** Plain CSS served as a static file from `public/css/` · CSS custom properties for tokens · ERB partials for reusable components · ERB templates rendered by modular Sinatra. Tokens are CSS variables — overridable per tenant. Tailwind is **optional** (a standalone CLI build step, below).
 
