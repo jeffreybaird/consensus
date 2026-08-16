@@ -58,6 +58,22 @@ class App < Sinatra::Base
 
   get "/scans/:id" do
     @scan = Scan[params[:id]] or halt 404
+    @report = Scans::Report.call(@scan)
     erb :"scans/show"
+  end
+
+  helpers do
+    # Display helpers only — no clinical decision lives here.
+    def ordinal(number)
+      value = number.round
+      suffix = if (11..13).cover?(value % 100) then "th"
+               else { 1 => "st", 2 => "nd", 3 => "rd" }.fetch(value % 10, "th")
+               end
+      "#{value}#{suffix}"
+    end
+
+    def grams(value) = value.round.to_s.gsub(/(\d)(?=(\d{3})+\z)/, '\1,')
+
+    def standard_name(symbol) = Standards::Names.standard(symbol)
   end
 end

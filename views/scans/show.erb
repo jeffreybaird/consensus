@@ -1,5 +1,38 @@
+<% study = @report.studies.first %>
+
 <h1>Scan · <span class="mono" data-testid="scan-ga"><%= @scan.ga_text %></span></h1>
-<p>
+<p class="scan-meta">
   <%= @scan.scanned_on.iso8601 %>
   <% if @scan.patient_ref %>· <%= @scan.patient_ref %><% end %>
+  <% if @scan.sex %>· sex: <%= @scan.sex %><% end %>
+  <% if @scan.stratum %>· stratum: <%= @scan.stratum %><% end %>
 </p>
+
+<section class="readouts" data-testid="measurements">
+  <% Scan::MEASUREMENTS.each do |kind, column| %>
+    <% value = @scan.public_send(column) %>
+    <div class="readout">
+      <span class="readout-label"><%= kind.to_s.upcase %></span>
+      <% if value %>
+        <span class="readout-value mono"><%= value %></span>
+        <span class="readout-unit">mm</span>
+      <% else %>
+        <span class="readout-missing">not recorded</span>
+      <% end %>
+    </div>
+  <% end %>
+</section>
+
+<h2>Growth</h2>
+<%= erb :"scans/_growth_table", locals: { rows: study.growth } %>
+
+<h2>Sources</h2>
+<ul data-testid="sources" class="sources">
+  <% citations = study.growth.flat_map { |row|
+       [row[:citation],
+        (row[:weight].success? ? row[:weight].value!.source.citation : nil)]
+     }.compact.uniq %>
+  <% citations.each do |citation| %>
+    <li><%= citation %></li>
+  <% end %>
+</ul>

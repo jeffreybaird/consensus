@@ -1,0 +1,41 @@
+<table data-testid="growth-table" class="growth-table">
+  <thead>
+    <tr>
+      <th scope="col">Standard</th>
+      <th scope="col">Weight</th>
+      <th scope="col">Percentile</th>
+      <th scope="col">Type</th>
+      <th scope="col">Inputs</th>
+    </tr>
+  </thead>
+  <tbody>
+    <% rows.each do |row| %>
+      <% reading = row[:report] %>
+      <% stratum = reading.success? ? reading.value!.source.stratum : nil %>
+      <% suffix = stratum unless stratum == :combined || stratum == @scan.sex_sym %>
+      <% testid = [row[:standard], suffix].compact.join("-") %>
+      <tr data-testid="growth-row-<%= testid %>">
+        <th scope="row">
+          <span class="series-chip series-<%= row[:standard] %>" aria-hidden="true"></span>
+          <%= standard_name(row[:standard]) %><% if stratum && stratum != :combined %> (<%= stratum %>)<% end %>
+        </th>
+        <% if reading.success? %>
+          <% weight = row[:weight].value! %>
+          <% percentile = reading.value! %>
+          <td class="mono">
+            <%= grams(weight.value) %> g<% if weight.uncertainty %> ±<%= weight.uncertainty.sd_pct %>%<% end %>
+          </td>
+          <td class="mono"><%= ordinal(percentile.value) %></td>
+          <td><%= percentile.source.type %></td>
+          <td class="mono"><%= weight.inputs.map { |kind| kind.to_s.upcase }.join("+") %></td>
+        <% elsif row[:weight].failure? %>
+          <td colspan="4" class="refusal" data-testid="refusal"><%= Scans::Reason.call(row[:weight].failure) %></td>
+        <% else %>
+          <% weight = row[:weight].value! %>
+          <td class="mono"><%= grams(weight.value) %> g</td>
+          <td colspan="3" class="refusal" data-testid="refusal"><%= Scans::Reason.call(reading.failure) %></td>
+        <% end %>
+      </tr>
+    <% end %>
+  </tbody>
+</table>
