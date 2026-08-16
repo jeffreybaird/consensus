@@ -18,12 +18,15 @@ require "rack/test"
 require "capybara/rspec"
 Capybara.app = App
 
+Dir[File.expand_path("support/**/*.rb", __dir__)].sort.each { |f| require f }
+
 module RequestHelpers
   include Rack::Test::Methods
   def app = App
 end
 
 RSpec.configure do |config|
+  config.include FactoryBot::Syntax::Methods
   config.include RequestHelpers, type: :request
   config.include RequestHelpers, type: :feature
 

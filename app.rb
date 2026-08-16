@@ -29,20 +29,35 @@ class App < Sinatra::Base
     '{"status":"ok"}'
   end
 
-  get "/" do
-    @notes = Note.recent.limit(50).all
-    erb :"notes/index"
+  PAGE_SIZE = 25
+
+  # The form's option lists come from the gem's catalog via Scans::Options —
+  # the same source the create service validates against.
+  def scan_index_locals
+    @scans = Scan.recent.limit(PAGE_SIZE).all
+    @sex_options = Scans::Options.sexes
+    @stratum_options = Scans::Options.strata
   end
 
-  post "/notes" do
-    result = Notes::Create.call(params)
+  get "/" do
+    scan_index_locals
+    erb :"scans/index"
+  end
+
+  post "/scans" do
+    result = Scans::Create.call(params)
     if result.success?
-      redirect "/"
+      redirect "/scans/#{result.value!.id}"
     else
-      @errors = result.failure
-      @notes  = Note.recent.limit(50).all
+      @errors = result.failure.last
+      scan_index_locals
       status 422
-      erb :"notes/index"
+      erb :"scans/index"
     end
+  end
+
+  get "/scans/:id" do
+    @scan = Scan[params[:id]] or halt 404
+    erb :"scans/show"
   end
 end

@@ -1,0 +1,79 @@
+<h1>Scans</h1>
+
+<% if defined?(@errors) && @errors&.any? %>
+  <div role="alert" data-testid="form-errors">
+    <p>The scan could not be saved:</p>
+    <ul>
+      <% @errors.each do |field, message| %>
+        <li><strong><%= field %></strong> <%= Array(message).join(", ") %></li>
+      <% end %>
+    </ul>
+  </div>
+<% end %>
+
+<form method="post" action="/scans" data-testid="new-scan-form" class="scan-form">
+  <fieldset>
+    <legend>Gestational age</legend>
+    <label for="scan_ga">GA (weeks and days)</label>
+    <input id="scan_ga" name="ga" required placeholder="32w0d" class="mono">
+
+    <label for="scan_scanned_on">Scan date</label>
+    <input id="scan_scanned_on" name="scanned_on" type="date">
+  </fieldset>
+
+  <fieldset>
+    <legend>Measurements (mm)</legend>
+    <label for="scan_bpd">BPD — biparietal diameter</label>
+    <input id="scan_bpd" name="bpd" inputmode="decimal" class="mono">
+
+    <label for="scan_hc">HC — head circumference</label>
+    <input id="scan_hc" name="hc" inputmode="decimal" class="mono">
+
+    <label for="scan_ac">AC — abdominal circumference</label>
+    <input id="scan_ac" name="ac" inputmode="decimal" class="mono">
+
+    <label for="scan_fl">FL — femur length</label>
+    <input id="scan_fl" name="fl" inputmode="decimal" class="mono">
+  </fieldset>
+
+  <fieldset>
+    <legend>Chart options</legend>
+    <label for="scan_sex">Sex (WHO sexed charts)</label>
+    <select id="scan_sex" name="sex">
+      <option value="">Combined</option>
+      <% @sex_options.each do |sex| %>
+        <option value="<%= sex %>"><%= sex.to_s.capitalize %></option>
+      <% end %>
+    </select>
+
+    <label for="scan_stratum">Stratum (NICHD charts)</label>
+    <select id="scan_stratum" name="stratum">
+      <option value="">All charts</option>
+      <% @stratum_options.each do |stratum| %>
+        <option value="<%= stratum %>"><%= stratum.to_s.capitalize %></option>
+      <% end %>
+    </select>
+
+    <label for="scan_patient_ref">Label (synthetic only — no real data)</label>
+    <input id="scan_patient_ref" name="patient_ref" placeholder="demo-001">
+  </fieldset>
+
+  <button type="submit">Save scan</button>
+</form>
+
+<h2>Recent</h2>
+<% if @scans.empty? %>
+  <p data-testid="empty-state">No scans yet — enter one above.</p>
+<% else %>
+  <ul data-testid="scan-list" class="scan-list">
+    <% @scans.each do |scan| %>
+      <li data-testid="scan-<%= scan.id %>">
+        <a href="/scans/<%= scan.id %>">
+          <span class="mono"><%= scan.ga_text %></span>
+          · <%= scan.scanned_on.iso8601 %>
+          <% if scan.patient_ref %>· <%= scan.patient_ref %><% end %>
+        </a>
+      </li>
+    <% end %>
+  </ul>
+<% end %>

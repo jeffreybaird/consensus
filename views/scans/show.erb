@@ -1,0 +1,5 @@
+<h1>Scan · <span class="mono" data-testid="scan-ga"><%= @scan.ga_text %></span></h1>
+<p>
+  <%= @scan.scanned_on.iso8601 %>
+  <% if @scan.patient_ref %>· <%= @scan.patient_ref %><% end %>
+</p>
