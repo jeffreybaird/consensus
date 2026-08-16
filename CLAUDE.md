@@ -26,7 +26,7 @@ built in, the honest answer is "plain Ruby + an explicit `require`", not a Rails
 - `.claude/architecture-decisions.md` — Result/error objects, audit logging, soft deletes, pagination, side effects, feature flags, idempotency
 - `.claude/separation-of-concerns.md` — what belongs in a route, a service object, a model, a view
 - `.claude/database.md` — **read this before any write-heavy or schema work**: Sequel, SQLite realities (single writer, WAL, `busy_timeout`), migrations, Litestream
-- `.claude/testing.md` — test-as-contract rule, FactoryBot, WebMock/VCR, `data-testid` selectors, request + feature specs
+- `.claude/testing.md` — test-as-contract rule, the agent roles (spec-writer owns `spec/`, hook-enforced), FactoryBot, `data-testid` selectors, request + feature specs
 - `.claude/observability.md` — OpenTelemetry, structured logging, a hand-rolled `Instrument` event bus
 - `.claude/scalability.md` — write buffers, caching, jobs by criticality, SSE, rate limiting — all under the SQLite single-writer constraint
 - `.claude/deployment.md` — the push-button-deploy pipeline: Docker + Puma, Caddy TLS, blue/green swap, the `rake db:migrate` gate, secrets/ENV

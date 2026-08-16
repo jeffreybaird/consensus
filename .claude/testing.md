@@ -11,8 +11,8 @@ Maturity tags: **[stable]** = mature, safe to rely on · **[active]** =
 maintained, evolving · **[optional]** = adopt only if the need exists.
 
 Loose gem pins below use `~>` — pin to the minor you adopt, let patch float.
-Replace `Consensus` / `consensus` with your real app/module names. The Sinatra base
-class is always `App` (a fixed name), booted by `run App` in `config.ru`.
+The Sinatra base class is always `App` (a fixed name), booted by `run App` in
+`config.ru`.
 
 ---
 
@@ -39,6 +39,45 @@ suggestions. These rules are absolute:
    message.
 
 The suite is a ratchet: it only moves forward.
+
+---
+
+## 1a. Who Writes Tests — Agent Roles (hook-enforced)
+
+The contract above is not just discipline; it is enforced by hooks (see
+`.claude/settings.json`), the same setup as the biometry gem's repo:
+
+- **`spec-writer`** (`.claude/agents/spec-writer.md`) **owns every file under
+  `spec/`.** It decomposes a requirement into failing unit / integration /
+  acceptance specs *before* implementation, matching the conventions already in
+  the suite, asserting on observable behavior only — never internal call order
+  or private names. It reports the files written and an ordering plan of
+  slices.
+- **`implementer`** implements one slice against pre-written failing specs, one
+  failure at a time, never touching a spec file or shared code outside its
+  slice.
+- **`test-runner`** runs the suite (or one spec) and reports failures verbatim —
+  no interpretation, no fixes.
+- **`reviewer`** reviews the finished diff after green: error paths, boundaries,
+  consistency with the codebase — green tests are the floor, not the finding.
+- **`Explore`** is the read-only search agent.
+
+Enforcement:
+
+- **`scripts/protect-tests.sh`** (PreToolUse hook): any agent other than
+  `spec-writer` is blocked from writing/editing anything matching
+  `spec/`, `_spec.rb` or `_test.rb`, including via shell redirection, `sed -i`,
+  `cp`/`mv`, or inline interpreters (`ruby -e`, `python3 -c`). The main
+  assistant is "everyone else": it delegates spec work to `spec-writer` and
+  reports spec problems instead of editing them. Escape hatch for a human:
+  `ALLOW_TEST_EDITS=1` in the environment.
+- **`scripts/gate.sh`** (TaskCompleted hook): a task cannot complete while
+  `bundle exec rspec` is red. The last 20 lines of the failing run are echoed.
+
+The workflow for any feature is therefore: `spec-writer` writes failing specs →
+implementation makes them pass (directly or via `implementer` slices) →
+`test-runner` confirms → `reviewer` reads the diff. A spec that seems wrong is
+*flagged to spec-writer*, never edited around.
 
 ---
 
