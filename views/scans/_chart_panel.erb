@@ -8,10 +8,10 @@
       <% if Array(result.value!).length > 1 %>
         <div data-testid="chart-<%= standard %>-<%= stratum %>">
           <h4><%= stratum.to_s.capitalize %></h4>
-          <%= erb :"scans/_chart", locals: { chart: chart } %>
+          <%== erb :"scans/_chart", locals: { chart: chart } %>
         </div>
       <% else %>
-        <%= erb :"scans/_chart", locals: { chart: chart } %>
+        <%== erb :"scans/_chart", locals: { chart: chart } %>
       <% end %>
     <% end %>
   <% else %>

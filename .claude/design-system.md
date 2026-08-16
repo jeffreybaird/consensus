@@ -159,13 +159,16 @@ region**. There is no token for "abnormal" and none may be added.
 
 ### Chart tokens (validated with the dataviz palette validator)
 
-Standard identity — fixed assignment, used for table row markers, chart title
-chips and legends; the same standard is the same hue everywhere, and the
-assignment never re-flows when a chart is missing:
+Standard identity — fixed assignment, used for table row markers and catalog
+chips; wherever a standard's identity is colored, it is this hue, and the
+assignment never re-flows when a chart is missing. Note the curves inside a
+chart do NOT use these: every chart's centile curves are the one ordinal blue
+ramp below (order, not identity — the panel heading and chip identify the
+standard):
 
 | Token | Standard | Dark | Light |
 |---|---|---|---|
-| `series-intergrowth` | INTERGROWTH-21st | `#3987e5` | `#2a78d6` |
+| `series-intergrowth21` | INTERGROWTH-21st | `#3987e5` | `#2a78d6` |
 | `series-hadlock-eq` | Hadlock 1991 (equation) | `#d95926` | `#eb6834` |
 | `series-hadlock-tab` | Hadlock 1991 (table) | `#199e70` | `#1baf7a` |
 | `series-who` | WHO | `#c98500` | `#eda100` |

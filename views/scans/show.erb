@@ -24,12 +24,12 @@
 </section>
 
 <h2>Growth</h2>
-<%= erb :"scans/_growth_table", locals: { rows: study.growth } %>
+<%== erb :"scans/_growth_table", locals: { rows: study.growth } %>
 
 <h2>Charts</h2>
 <section data-testid="charts" class="charts">
   <% @charts.each do |standard, result| %>
-    <%= erb :"scans/_chart_panel", locals: { standard: standard, result: result } %>
+    <%== erb :"scans/_chart_panel", locals: { standard: standard, result: result } %>
   <% end %>
 </section>
 

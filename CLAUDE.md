@@ -71,6 +71,14 @@ shared across requests). See `../rei_calc/docs/LIBRARY.md` for the library API a
 - **No clinical constants in this app.** Every clinical number comes from the gem. If the
   UI seems to need one, the gem is missing it — stop and say so.
 
+### Deliberate V1 deviations
+
+Two architecture-decisions.md rules are consciously deferred while the app's
+only mutation is "save a scan" of synthetic data: there is **no audit_logs
+table** and **no soft delete** (there is no delete at all). The moment a
+second mutation, a destructive action, or anything resembling real data
+arrives, both rules apply in full — do not add such a feature without them.
+
 ### Data honesty
 
 This app holds **no real patient data** — every `patient_ref` is a synthetic label, and

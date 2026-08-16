@@ -130,11 +130,64 @@ RSpec.describe "Scan report as JSON", type: :request do
       end
     end
 
+    # A consumer that asked for JSON is answered in JSON, including when the
+    # answer is "there is no such scan": an HTML page or an empty body arrives
+    # at a parser that can read neither.
     context "when the scan does not exist" do
+      before { get "/scans/999999.json" }
+
       it "responds 404" do
-        get "/scans/999999.json"
+        expect(last_response.status).to eq(404)
+      end
+
+      it "answers as JSON" do
+        expect(last_response.headers["Content-Type"]).to include("application/json")
+      end
+
+      it "parses" do
+        expect { body }.not_to raise_error
+      end
+
+      it "says what went wrong rather than returning nothing" do
+        expect(body).to have_key("error")
+        expect(body["error"]).to be_a(String)
+        expect(body["error"]).not_to be_empty
+      end
+
+      it "carries no report" do
+        expect(body).not_to have_key("report")
+      end
+    end
+
+    context "when the id is not a canonical integer" do
+      before { get "/scans/abc.json" }
+
+      it "responds 404 in JSON rather than failing" do
+        expect(last_response.status).to eq(404)
+        expect(last_response.headers["Content-Type"]).to include("application/json")
+        expect(body).to have_key("error")
+      end
+    end
+
+    # A padded spelling of a real id is not that id here either, and a consumer
+    # that used one is told so in the format it asked for.
+    context "when the id is a non-canonical spelling of a real id" do
+      let!(:scan) { create(:scan) }
+
+      it "serves the canonical spelling" do
+        get "/scans/#{scan.id}.json"
+
+        expect(last_response).to be_ok
+        expect(body["scan"]["id"]).to eq(scan.id)
+      end
+
+      it "responds 404 in JSON for the padded spelling" do
+        get "/scans/0#{scan.id}.json"
 
         expect(last_response.status).to eq(404)
+        expect(last_response.headers["Content-Type"]).to include("application/json")
+        expect(body["error"]).to be_a(String)
+        expect(body).not_to have_key("scan")
       end
     end
   end

@@ -73,19 +73,52 @@ RSpec.describe Scans::Reason do
     end
 
     context "when the input was invalid" do
-      it "says so in words" do
-        expect(sentence(:invalid_input, { ga: ["is not present"] })).to match(/invalid input/i)
+      let(:result) { sentence(:invalid_input, { ga: ["is not present"] }) }
+
+      it "names the field that could not be read" do
+        expect(result).to include("ga")
+      end
+
+      it "repeats what was wrong with it" do
+        expect(result).to include("is not present")
+      end
+    end
+
+    context "when the centile asked for is not one the standard publishes" do
+      let(:result) do
+        sentence(:unsupported_centile,
+                 { standard: :who, requested: 2.5, available: [5, 10, 25, 50, 75, 90, 95] })
+      end
+
+      it "names the standard" do
+        expect(result).to match(/WHO/)
+      end
+
+      it "lists the centiles that standard does publish" do
+        [5, 10, 25, 50, 75, 90, 95].each { |centile| expect(result).to include(centile.to_s) }
+      end
+
+      it "names the centile that was asked for" do
+        expect(result).to include("2.5")
+      end
+    end
+
+    context "when no chart is served under the name asked for" do
+      let(:result) do
+        sentence(:unsupported_standard, { requested: :banana, available: %i[intergrowth21 who] })
+      end
+
+      it "names what was asked for" do
+        expect(result).to include("banana")
+      end
+
+      it "names what is on offer, by display name rather than by id" do
+        expect(result).to include("INTERGROWTH-21st").and include("WHO")
+        expect(result).not_to include("intergrowth21")
       end
     end
 
     context "with a tag this app has no wording for" do
-      it "humanises the tag rather than raising" do
-        result = sentence(:unsupported_centile,
-                          { standard: :who, requested: 42, available: [3, 10, 50, 90, 97] })
-
-        expect(result).to match(/unsupported centile/i)
-      end
-
       it "handles a tag it has never seen" do
         expect { sentence(:kaboom_frobnicator, {}) }.not_to raise_error
         expect(sentence(:kaboom_frobnicator, {})).to match(/kaboom frobnicator/i)
@@ -103,7 +136,8 @@ RSpec.describe Scans::Reason do
         insufficient_data: { required: %i[hc ac fl], given: [:bpd] },
         formula_chart_mismatch: { chart: :nichd, expected: :hadlock_hc_ac_fl, given: :intergrowth },
         invalid_input: { ga: ["is not present"] },
-        unsupported_standard: { requested: :crl, available: %i[lmp transfer] }
+        unsupported_standard: { requested: :crl, available: %i[lmp transfer] },
+        unsupported_centile: { standard: :nichd, requested: 2.5, available: [5, 50, 95] }
       }
 
       failures.each do |tag, payload|

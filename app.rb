@@ -35,7 +35,7 @@ class App < Sinatra::Base
   # The form's option lists come from the gem's catalog via Scans::Options —
   # the same source the create service validates against.
   def scan_index_locals
-    @scans = Scan.recent.limit(PAGE_SIZE).all
+    @scans = Scan.page(params["page"] || 1, per: PAGE_SIZE).all
     @sex_options = Scans::Options.sexes
     @stratum_options = Scans::Options.strata
   end
@@ -60,13 +60,12 @@ class App < Sinatra::Base
   # The report as data: the same document the gem's CLI prints as --json,
   # wrapped in an envelope naming the saved scan it was computed from.
   get "/scans/:id.json" do
-    scan = Scan[params[:id]] or halt 404
     content_type :json
-    document = Biometry::Services::Report::Document.new.call(**Scans::Report.call(scan).to_h)
+    scan = scan_or_404 { |id| JSON.generate(error: "no scan with id #{id}") }
     JSON.generate(
       scan: { id: scan.id, ga: scan.ga_text, scanned_on: scan.scanned_on.iso8601,
               patient_ref: scan.patient_ref, sex: scan.sex, stratum: scan.stratum },
-      report: document
+      report: Scans::Document.call(scan)
     )
   end
 
@@ -76,21 +75,49 @@ class App < Sinatra::Base
   end
 
   get "/scans/:id" do
-    @scan = Scan[params[:id]] or halt 404
+    @scan = scan_or_404
     @report = Scans::Report.call(@scan)
-    @charts = BIOMETRY.charts.keys.to_h { |id| [id, Scans::Chart.call(@scan, standard: id)] }
+    row_order = @report.studies.first.growth.map { |row| row[:standard] }.uniq
+    @charts = Scans::Charts.call(@scan, order: row_order)
     erb :"scans/show"
   end
 
   get "/scans/:id/charts/:standard" do
-    @scan = Scan[params[:id]] or halt 404
+    @scan = scan_or_404
     @standard = params[:standard].to_sym
-    halt 404 unless BIOMETRY.charts.key?(@standard)
+    halt 404, not_found_page unless BIOMETRY.charts.key?(@standard)
     @result = Scans::Chart.call(@scan, standard: @standard)
     erb :"scans/chart"
   end
 
+  # A 404 always says so: routes that halted with their own body (the JSON
+  # one) keep it; a bare halt or an unknown path gets the page.
+  not_found do
+    current = response.body
+    current = current.join if current.respond_to?(:join)
+    current.to_s.empty? ? not_found_page : current
+  end
+
   helpers do
+    # Canonical ids only: exactly the decimal digits with no leading zero —
+    # Integer() alone would read "01" as octal 1 and "0x10" as 16 while
+    # 404ing "08", which is the kind of inconsistency someone eventually
+    # notices in production. The block supplies a content-typed 404 body
+    # (JSON route).
+    CANONICAL_ID = /\A(?:0|[1-9]\d*)\z/
+
+    def scan_or_404
+      scan = CANONICAL_ID.match?(params[:id].to_s) && Scan[params[:id].to_i]
+      return scan if scan
+
+      halt 404, (block_given? ? yield(params[:id]) : not_found_page)
+    end
+
+    def not_found_page
+      "<h1>Not found</h1><p>Nothing lives at this address. " \
+        "<a href=\"/\">Back to scans</a>.</p>"
+    end
+
     # Display helpers only — no clinical decision lives here.
     def ordinal(number)
       value = number.round

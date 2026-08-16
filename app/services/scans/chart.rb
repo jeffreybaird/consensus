@@ -11,22 +11,27 @@ module Scans
   class Chart
     def self.call(...) = new.call(...)
 
-    def call(scan, standard:)
+    # `weights` lets a caller drawing several charts weigh the scan once;
+    # left nil, the service asks the gem itself.
+    def call(scan, standard:, weights: nil)
       BIOMETRY.chart_series(
         standard: standard,
         sex: scan.sex_sym,
         stratum: scan.stratum_sym,
-        point: point_for(scan, standard)
+        point: point_for(scan, standard, weights)
       )
     end
 
     private
 
-    def point_for(scan, standard)
+    def point_for(scan, standard, weights)
       entry = BIOMETRY.charts[standard]
       return nil unless entry
 
-      weight = BIOMETRY.weights(scan.to_biometry_scan).value![entry[:formula]]
+      weighed = weights || BIOMETRY.weights(scan.to_biometry_scan)
+      return nil unless weighed.success?
+
+      weight = weighed.value![entry[:formula]]
       return nil unless weight&.success?
 
       { estimate: weight.value!, ga: scan.ga }

@@ -102,6 +102,8 @@ h2 { margin-top: 2.5rem; border-bottom: 1px solid var(--border); padding-bottom:
   margin-bottom: 1.5rem;
 }
 .site-header .brand { font-weight: 700; text-decoration: none; letter-spacing: 0.04em; }
+.site-header nav { display: flex; align-items: center; gap: 1rem; }
+[data-theme-toggle] { min-width: 2.75rem; min-height: 2.75rem; background: var(--elevated); color: var(--text-primary); border: 1px solid var(--border); }
 
 /* 3. Forms */
 .scan-form fieldset {
@@ -191,7 +193,9 @@ button:hover { background: var(--accent-hover); }
   font-size: 11px;
 }
 .growth-chart .centile-curve { stroke-width: 1.5; fill: none; }
-.growth-chart .centile-curve.centile-3 { stroke-width: 2.5; }
+/* Emphasis belongs to the published median, never to a ramp position that
+   could land on an arbitrary curve and read as a reference line. */
+.growth-chart .centile-curve.median { stroke-width: 2.5; }
 .growth-chart .centile-1 { stroke: var(--centile-1); }
 .growth-chart .centile-2 { stroke: var(--centile-2); }
 .growth-chart .centile-3 { stroke: var(--centile-3); }

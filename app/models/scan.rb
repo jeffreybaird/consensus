@@ -8,6 +8,12 @@ class Scan < Sequel::Model
 
   dataset_module do
     def recent = order(Sequel.desc(:created_at), Sequel.desc(:id))
+
+    # Pagination contract: page/per clamped, never unbounded.
+    def page(number, per: 25)
+      per = per.to_i.clamp(1, 100)
+      recent.limit(per, (number.to_i.clamp(1, 10_000) - 1) * per)
+    end
   end
 
   def validate

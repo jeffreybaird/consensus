@@ -34,13 +34,18 @@ module Scans
     private
 
     def parsed(params, errors)
-      { ga_days: ga_days(params["ga"], errors),
-        scanned_on: scanned_on(params["scanned_on"], errors),
-        patient_ref: presence(params["patient_ref"]),
-        sex: option(:sex, params["sex"], sexes, errors),
-        stratum: option(:stratum, params["stratum"], strata, errors) }
+      { ga_days: ga_days(text(params["ga"]), errors),
+        scanned_on: scanned_on(text(params["scanned_on"]), errors),
+        patient_ref: presence(text(params["patient_ref"])),
+        sex: option(:sex, text(params["sex"]), sexes, errors),
+        stratum: option(:stratum, text(params["stratum"]), strata, errors) }
         .merge(measurements(params, errors))
     end
+
+    # The boundary: Rack params can arrive as arrays or hashes (`bpd[]=1`).
+    # Anything that is not a String is treated as unsupplied and falls into
+    # the same validation failure the field already produces — never a 500.
+    def text(value) = value.is_a?(String) ? value : nil
 
     def ga_days(text, errors)
       match = GA_FORMAT.match(text.to_s.strip)
@@ -63,7 +68,7 @@ module Scans
 
     def measurements(params, errors)
       Scan::MEASUREMENTS.to_h do |kind, column|
-        [column, measurement(kind, params[kind.to_s], errors)]
+        [column, measurement(kind, text(params[kind.to_s]), errors)]
       end
     end
 

@@ -19,7 +19,7 @@
     <line class="axis" x1="48" y1="16" x2="48" y2="364" />
 
     <% chart.series.each do |series| %>
-      <polyline class="centile-curve <%= centile_class(chart, series) %>"
+      <polyline class="centile-curve <%= centile_class(chart, series) %><%= ' median' if series.centile == 50 %>"
                 points="<%= polyline_points(series, view) %>" fill="none" />
       <% last = series.points.last %>
       <text class="curve-label" x="<%= view[:x].call(last[:ga_weeks]) + 6 %>"

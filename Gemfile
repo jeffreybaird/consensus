@@ -7,6 +7,9 @@ source "https://rubygems.org"
 ruby file: ".ruby-version"
 
 gem "sinatra", "~> 4.1", require: "sinatra/base" # modular app, no classic DSL
+gem "erubi", "~> 1.13"                           # ERB engine WITH escape_html support —
+                                                 # without it Tilt falls back to un-escaping ERB
+                                                 # and `set :erb, escape_html: true` is inert
 gem "puma", "~> 6.6"                             # app server (config/puma.rb)
 gem "rackup", "~> 2.2"                           # `run App` entrypoint (config.ru)
 gem "sequel", "~> 5.90"                          # ORM + migrations

@@ -13,8 +13,28 @@ module Scans
       when :out_of_range then out_of_range(details)
       when :insufficient_data then insufficient_data(details)
       when :formula_chart_mismatch then mismatch(details)
+      when :unsupported_standard then unsupported_standard(details)
+      when :unsupported_centile then unsupported_centile(details)
+      when :invalid_input then invalid_input(details)
       else fallback(tag, details)
       end
+    end
+
+    def unsupported_standard(details)
+      "No chart is served as #{details[:requested]}; available: " \
+        "#{Array(details[:available]).map { |id| Standards::Names.standard(id) }.join(', ')}."
+    end
+
+    def unsupported_centile(details)
+      "#{Standards::Names.standard(details[:standard])} publishes centiles " \
+        "#{Array(details[:available]).join(', ')}; #{details[:requested]} is not among them."
+    end
+
+    def invalid_input(details)
+      return fallback(:invalid_input, details) unless details.is_a?(Hash)
+
+      pairs = details.map { |field, value| "#{field} #{value.inspect}" }.join(", ")
+      "This request could not be read: #{pairs}."
     end
 
     def out_of_range(details)

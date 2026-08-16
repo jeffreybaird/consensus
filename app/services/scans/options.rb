@@ -13,10 +13,13 @@ module Scans
 
     def strata = stratification(:nichd)
 
+    # A standard the gem's loader pruned yields no options rather than a
+    # crash: the app still boots and says less, which is the honest state.
     def stratification(id)
-      BIOMETRY.catalog.growth_standards
-              .find { |standard| standard.id == id }
-              .stratification[:values].map(&:to_sym)
+      standard = BIOMETRY.catalog.growth_standards.find { |each| each.id == id }
+      return [] unless standard
+
+      standard.stratification[:values].map(&:to_sym)
     end
   end
 end

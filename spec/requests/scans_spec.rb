@@ -597,4 +597,226 @@ RSpec.describe "Scans", type: :request do
       end
     end
   end
+
+  # A stored label is data, never markup. The label below is the only place in
+  # the suite where a saved value could reach the browser as a tag, so both
+  # pages that print it are checked — and checked to still render their own
+  # structure, because a template escaped twice renders its markup as text.
+  describe "a scan whose label contains markup" do
+    let(:markup) { "<script>alert(1)</script><b>x" }
+    let(:scan) { create(:scan, patient_ref: markup) }
+
+    context "on the scan page" do
+      before { get "/scans/#{scan.id}" }
+
+      it "responds ok" do
+        expect(last_response).to be_ok
+      end
+
+      it "renders the label as text, not as a tag" do
+        expect(last_response.body).not_to include("<script>alert(1)")
+        expect(last_response.body).not_to include("<b>x")
+      end
+
+      it "shows the label escaped" do
+        expect(last_response.body).to include("&lt;script&gt;")
+      end
+
+      it "still renders the page's own structure" do
+        expect(Capybara.string(last_response.body)
+                       .all('[data-testid="growth-table"]', visible: :all).size).to eq(1)
+      end
+
+      it "still renders the partials' markup as markup" do
+        rendered = Capybara.string(last_response.body)
+
+        expect(rendered.all('[data-testid="charts"]', visible: :all).size).to eq(1)
+        expect(rendered.all('[data-testid^="growth-row-"]', visible: :all)).not_to be_empty
+      end
+    end
+
+    context "on the scan list" do
+      before do
+        scan
+        get "/"
+      end
+
+      it "responds ok" do
+        expect(last_response).to be_ok
+      end
+
+      it "renders the label as text, not as a tag" do
+        expect(last_response.body).not_to include("<script>alert(1)")
+        expect(last_response.body).not_to include("<b>x")
+      end
+
+      it "shows the label escaped" do
+        expect(last_response.body).to include("&lt;script&gt;")
+      end
+
+      it "still renders the list" do
+        expect(last_response.body).to include('data-testid="scan-list"')
+        expect(last_response.body).to include(%(data-testid="scan-#{scan.id}"))
+      end
+    end
+  end
+
+  # Rack turns `bpd[]=1` into an Array. That is not a crash: a field that did
+  # not arrive as text counts as unsupplied, and the request lands on the same
+  # success or validation failure a blank field does.
+  describe "POST /scans with array parameters" do
+    context "when the measurements, sex and date arrive as arrays" do
+      let(:params) do
+        { "ga" => "32w0d", "bpd" => ["1"], "sex" => ["male"], "scanned_on" => ["x"] }
+      end
+
+      it "does not fail" do
+        post "/scans", params
+
+        expect(last_response.status).not_to eq(500)
+      end
+
+      it "saves the scan, treating the array fields as unsupplied" do
+        post "/scans", params
+        saved = Scan.order(:id).last
+
+        expect(last_response.status).to eq(302)
+        expect(last_response.headers["Location"]).to end_with("/scans/#{saved&.id}")
+      end
+
+      it "records nothing for the fields that did not arrive as text" do
+        post "/scans", params
+        saved = Scan.order(:id).last
+
+        expect(saved.bpd_mm).to be_nil
+        expect(saved.sex).to be_nil
+        expect(saved.scanned_on).to eq(Date.today)
+      end
+    end
+
+    context "when the gestational age arrives as an array" do
+      let(:params) { { "ga" => ["32w0d"] } }
+
+      it "does not fail" do
+        post "/scans", params
+
+        expect(last_response.status).not_to eq(500)
+      end
+
+      it "responds 422" do
+        post "/scans", params
+
+        expect(last_response.status).to eq(422)
+      end
+
+      it "renders the errors" do
+        post "/scans", params
+
+        expect(last_response.body).to include('data-testid="form-errors"')
+      end
+
+      it "says how a gestational age reads, in the service's own words" do
+        message = Scans::Create.call(params).failure.last[:ga]
+
+        post "/scans", params
+
+        expect(message).not_to be_nil
+        expect(last_response.body).to include(message)
+      end
+
+      it "persists nothing" do
+        expect { post "/scans", params }.not_to change(Scan, :count)
+      end
+    end
+  end
+
+  # A 404 is a page a person landed on, not an empty response: it says so and
+  # offers the way back.
+  describe "a request for a scan that cannot be found" do
+    def bad_ids = ["999999", "abc", "1.0"]
+
+    before { create(:scan) }
+
+    it "responds 404 for an unknown id, a non-numeric id and a decimal id" do
+      bad_ids.each do |id|
+        get "/scans/#{id}"
+
+        expect(last_response.status).to eq(404)
+      end
+    end
+
+    it "answers with a page rather than an empty body" do
+      bad_ids.each do |id|
+        get "/scans/#{id}"
+
+        expect(last_response.body).not_to be_empty
+        expect(last_response.body).to match(/not found/i)
+      end
+    end
+
+    it "offers the way back to the scans" do
+      bad_ids.each do |id|
+        get "/scans/#{id}"
+
+        expect(Capybara.string(last_response.body).all('a[href="/"]', visible: :all))
+          .not_to be_empty
+      end
+    end
+
+    it "answers an unknown path the same way" do
+      get "/nothing-here"
+
+      expect(last_response.status).to eq(404)
+      expect(last_response.body).to match(/not found/i)
+    end
+
+    it "still serves a scan that does exist" do
+      scan = Scan.order(:id).last
+
+      get "/scans/#{scan.id}"
+
+      expect(last_response).to be_ok
+    end
+
+    # One scan has one address. A padded, hexadecimal or space-wrapped spelling
+    # of the same number is a different string and is not that address — each
+    # of these would otherwise be coerced to an existing id.
+    context "when the id is a non-canonical spelling of a real id" do
+      # "01" and " 1 " both coerce to 1; "0x10" would coerce to 16.
+      def non_canonical_ids = ["01", "0x10", "%201%20"]
+
+      it "serves the canonical spelling" do
+        get "/scans/#{Scan.order(:id).last.id}"
+
+        expect(last_response).to be_ok
+      end
+
+      it "responds 404 for every other spelling" do
+        non_canonical_ids.each do |id|
+          get "/scans/#{id}"
+
+          expect(last_response.status).to eq(404)
+        end
+      end
+
+      it "answers each with the not-found page rather than an empty body" do
+        non_canonical_ids.each do |id|
+          get "/scans/#{id}"
+
+          expect(last_response.body).not_to be_empty
+          expect(last_response.body).to match(/not found/i)
+          expect(Capybara.string(last_response.body).all('a[href="/"]', visible: :all))
+            .not_to be_empty
+        end
+      end
+
+      it "renders no scan of its own" do
+        non_canonical_ids.each do |id|
+          get "/scans/#{id}"
+
+          expect(last_response.body).not_to include('data-testid="growth-table"')
+        end
+      end
+    end
+  end
 end
