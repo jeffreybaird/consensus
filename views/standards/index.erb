@@ -1,0 +1,95 @@
+<h1>Standards</h1>
+<p>
+  Everything this application serves, as the biometry gem's catalog describes
+  it — every entry names its paper. Numbers are reported with their sources;
+  interpreting them is a clinician's job.
+</p>
+
+<h2>Growth standards</h2>
+<section data-testid="growth-standards">
+  <% @catalog.growth_standards.each do |standard| %>
+    <article data-testid="standard-<%= standard.id %>" class="catalog-entry">
+      <h3>
+        <span class="series-chip series-<%= standard.id %>" aria-hidden="true"></span>
+        <%= Standards::Names.standard(standard.id) %>
+      </h3>
+      <dl>
+        <dt>Type</dt><dd><%= standard.type %> · <%= standard.access %></dd>
+        <dt>Gestation window</dt>
+        <dd class="mono"><%= standard.valid_ga_weeks.join("–") %> weeks<% if standard.ga_units %> (<%= standard.ga_units.to_s.tr("_", " ") %>)<% end %></dd>
+        <dt>Paired formula</dt><dd><%= Standards::Names.formula(standard.paired_formula) %></dd>
+        <% values = standard.stratification[:values] %>
+        <% unless values.nil? || values.empty? %>
+          <dt>Charts</dt><dd><%= values.join(", ") %></dd>
+        <% end %>
+        <dt>Citation</dt>
+        <dd>
+          <%= standard.citation %>
+          <% if standard.doi %>
+            · <a href="https://doi.org/<%= standard.doi %>">doi:<%= standard.doi %></a>
+          <% end %>
+          <% if standard.pmid %> · PMID <%= standard.pmid %><% end %>
+        </dd>
+      </dl>
+      <% if standard.variant_note %>
+        <p class="variant-note"><%= standard.variant_note %></p>
+      <% end %>
+      <% if standard.known_issues && !standard.known_issues.empty? %>
+        <details class="known-issues">
+          <summary>Known issues (<%= standard.known_issues.length %>)</summary>
+          <ul>
+            <% standard.known_issues.each do |issue| %>
+              <li><strong><%= issue[:id] %></strong> — <%= issue[:detail] %></li>
+            <% end %>
+          </ul>
+        </details>
+      <% end %>
+    </article>
+  <% end %>
+</section>
+
+<h2>Weight formulas</h2>
+<section data-testid="efw-formulas">
+  <% @catalog.efw_formulas.each do |formula| %>
+    <article data-testid="formula-<%= formula.id %>" class="catalog-entry">
+      <h3><%= Standards::Names.formula(formula.id) %></h3>
+      <dl>
+        <dt>Requires</dt>
+        <dd class="mono" data-testid="formula-<%= formula.id %>-requires"><%= formula.requires.map { |kind| kind.to_s.upcase }.join(", ") %></dd>
+        <dt>Equation</dt><dd><pre class="mono equation"><%= formula.equation %></pre></dd>
+        <dt>Citation</dt>
+        <dd>
+          <%= formula.citation %>
+          <% if formula.doi %> · <a href="https://doi.org/<%= formula.doi %>">doi:<%= formula.doi %></a><% end %>
+          <% if formula.pmid %> · PMID <%= formula.pmid %><% end %>
+        </dd>
+      </dl>
+    </article>
+  <% end %>
+</section>
+
+<h2>Dating methods</h2>
+<section data-testid="dating-methods">
+  <% @catalog.dating_methods.each do |method| %>
+    <article class="catalog-entry">
+      <h3><%= Standards::Names.standard(method.standard) %> (<%= method.derivation %>)</h3>
+      <p><%= method.citation %></p>
+    </article>
+  <% end %>
+</section>
+
+<h2>Redating policy</h2>
+<section data-testid="redating-policy" class="catalog-entry">
+  <p><%= @catalog.redating_policy.citation %></p>
+  <% issues = @catalog.redating_policy.known_issues %>
+  <% if issues && !issues.empty? %>
+    <details class="known-issues">
+      <summary>Known issues (<%= issues.length %>)</summary>
+      <ul>
+        <% issues.each do |issue| %>
+          <li><strong><%= issue[:id] %></strong> — <%= issue[:detail] %></li>
+        <% end %>
+      </ul>
+    </details>
+  <% end %>
+</section>

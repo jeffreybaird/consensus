@@ -2,6 +2,7 @@
 
 require "sinatra/base"
 require "securerandom"
+require "json"
 
 # The application. Routes stay thin: parse params, call a service object, render.
 # Business rules and SQL live in app/services and app/models — never here.
@@ -54,6 +55,24 @@ class App < Sinatra::Base
       status 422
       erb :"scans/index"
     end
+  end
+
+  # The report as data: the same document the gem's CLI prints as --json,
+  # wrapped in an envelope naming the saved scan it was computed from.
+  get "/scans/:id.json" do
+    scan = Scan[params[:id]] or halt 404
+    content_type :json
+    document = Biometry::Services::Report::Document.new.call(**Scans::Report.call(scan).to_h)
+    JSON.generate(
+      scan: { id: scan.id, ga: scan.ga_text, scanned_on: scan.scanned_on.iso8601,
+              patient_ref: scan.patient_ref, sex: scan.sex, stratum: scan.stratum },
+      report: document
+    )
+  end
+
+  get "/standards" do
+    @catalog = BIOMETRY.catalog
+    erb :"standards/index"
   end
 
   get "/scans/:id" do
