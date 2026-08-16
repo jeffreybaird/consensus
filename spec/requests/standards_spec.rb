@@ -140,9 +140,12 @@ RSpec.describe "Standards", type: :request do
         expect(rendered.all('[data-testid="efw-formulas"]', visible: :all).size).to eq(1)
       end
 
+      # The entries themselves, not the elements nested inside them: an entry
+      # carries its own "-requires" testid, which shares the prefix.
       it "renders one entry per formula the catalog serves" do
         ids = section("efw-formulas").all('[data-testid^="formula-"]', visible: :all)
                                      .map { |node| node[:"data-testid"] }
+                                     .reject { |id| id.end_with?("-requires") }
 
         expect(ids).to match_array(catalog.efw_formulas.map { |f| "formula-#{f.id}" })
       end
