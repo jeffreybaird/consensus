@@ -1,0 +1,59 @@
+<%# One ChartSeries → one SVG. Curves are the standard's own centiles (ordinal
+    blue ramp, labelled); the point is ink with a crosshair — never a hue that
+    could read as a verdict. %>
+<% view = chart_view(chart) %>
+<figure class="chart-figure">
+  <svg viewBox="0 0 640 400" role="img" aria-label="<%= chart_label(chart) %>" class="growth-chart">
+    <%# gridlines: presentation arithmetic only %>
+    <% (view[:from]..view[:to]).step(2) do |week| %>
+      <line class="grid" x1="<%= view[:x].call(week) %>" y1="16" x2="<%= view[:x].call(week) %>" y2="364" />
+      <% if ((week - view[:from]) % 4).zero? %>
+        <text class="axis-label" x="<%= view[:x].call(week) %>" y="380" text-anchor="middle"><%= week %></text>
+      <% end %>
+    <% end %>
+    <% (0..view[:y_top]).step(500) do |g| %>
+      <line class="grid" x1="48" y1="<%= view[:y].call(g) %>" x2="584" y2="<%= view[:y].call(g) %>" />
+      <text class="axis-label" x="40" y="<%= view[:y].call(g) + 4 %>" text-anchor="end"><%= g %></text>
+    <% end %>
+    <line class="axis" x1="48" y1="364" x2="584" y2="364" />
+    <line class="axis" x1="48" y1="16" x2="48" y2="364" />
+
+    <% chart.series.each do |series| %>
+      <polyline class="centile-curve <%= centile_class(chart, series) %>"
+                points="<%= polyline_points(series, view) %>" fill="none" />
+      <% last = series.points.last %>
+      <text class="curve-label" x="<%= view[:x].call(last[:ga_weeks]) + 6 %>"
+            y="<%= view[:y].call(last[:grams]) + 4 %>">P<%= series.centile %></text>
+    <% end %>
+
+    <% if chart.point %>
+      <% px = view[:x].call(chart.point[:ga_weeks]) %>
+      <% py = view[:y].call(chart.point[:efw_g]) %>
+      <g data-testid="chart-point">
+        <line class="crosshair" x1="<%= px %>" y1="16" x2="<%= px %>" y2="364" />
+        <line class="crosshair" x1="48" y1="<%= py %>" x2="584" y2="<%= py %>" />
+        <circle class="point" cx="<%= px %>" cy="<%= py %>" r="5" />
+      </g>
+    <% end %>
+
+    <text class="axis-title" x="316" y="398" text-anchor="middle"><%= ga_axis_label(chart) %></text>
+  </svg>
+  <figcaption>
+    <% if chart.point %>
+      <span class="mono"><%= grams(chart.point[:efw_g]) %> g — <%= ordinal(chart.point[:percentile][:value]) %> percentile</span> ·
+    <% end %>
+    <%= chart.source[:citation] %> · <%= chart.chart[:type] %>
+    <% if chart.chart[:variant] %>· <%= chart.chart[:variant] %> reading<% end %>
+    <% if chart.chart[:stratum] %>· <%= chart.chart[:stratum] %><% end %>
+  </figcaption>
+  <% unless chart.known_issues.empty? %>
+    <details class="known-issues">
+      <summary>Known issues with this standard (<%= chart.known_issues.length %>)</summary>
+      <ul>
+        <% chart.known_issues.each do |issue| %>
+          <li><strong><%= issue[:id] %></strong> — <%= issue[:detail] %></li>
+        <% end %>
+      </ul>
+    </details>
+  <% end %>
+</figure>

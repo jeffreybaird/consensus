@@ -312,4 +312,289 @@ RSpec.describe "Scans", type: :request do
       end
     end
   end
+
+  # Every expectation below is checked against the chart series the gem returns
+  # for the same scan — curve counts, citations, refusal sentences and known
+  # issues are read out of BIOMETRY inside the example, never typed here.
+  describe "chart panels" do
+    def rendered = Capybara.string(last_response.body)
+
+    def panel(standard) = rendered.find(%([data-testid="chart-#{standard}"]))
+
+    def stratum_panel(standard, stratum)
+      rendered.find(%([data-testid="chart-#{standard}-#{stratum}"]))
+    end
+
+    def curves(node) = node.all("polyline, path", visible: :all)
+
+    def svgs(node) = node.all("svg", visible: :all)
+
+    def points(node) = node.all('[data-testid="chart-point"]', visible: :all)
+
+    def refusals(node) = node.all('[data-testid="chart-refusal"]', visible: :all)
+
+    # A stratified standard asked without a stratum draws one chart per
+    # stratum, each in its own sub-panel; every other standard draws one.
+    def drawn_panels(standard, result)
+      charts = charts_of(result)
+      return [panel(standard)] if charts.one?
+
+      charts.map { |chart| stratum_panel(standard, chart.chart[:stratum]) }
+    end
+
+    def each_drawn_chart(scan)
+      BIOMETRY.charts.each_key do |standard|
+        result = gem_chart(scan, standard)
+        next if result.failure?
+
+        drawn_panels(standard, result).zip(charts_of(result)) { |node, chart| yield(node, chart, standard) }
+      end
+    end
+
+    def dispersion_detail
+      BIOMETRY.catalog.growth_standards
+              .find { |descriptor| descriptor.id == :hadlock_1991_equation }
+              .known_issues
+              .find { |issue| issue[:id].to_s.include?("dispersion") }
+              .fetch(:detail)
+    end
+
+    def polyline_geometry(standard)
+      curves(panel(standard)).map { |curve| curve[:points] }
+    end
+
+    describe "GET /scans/:id with a complete scan" do
+      let(:scan) { create(:scan) }
+
+      before { get "/scans/#{scan.id}" }
+
+      it "renders the charts section once" do
+        expect(rendered.all('[data-testid="charts"]').size).to eq(1)
+      end
+
+      it "renders one panel per chart the gem serves" do
+        BIOMETRY.charts.each_key do |standard|
+          expect(rendered.all(%([data-testid="chart-#{standard}"]), visible: :all).size).to eq(1)
+        end
+      end
+
+      it "gives the stratified standard one panel per stratum it publishes" do
+        charts = charts_of(gem_chart(scan, :nichd))
+
+        expect(charts.size).to be > 1
+        charts.each do |chart|
+          expect(svgs(stratum_panel(:nichd, chart.chart[:stratum])).size).to eq(1)
+        end
+      end
+
+      it "draws an image-role svg for every chart" do
+        each_drawn_chart(scan) do |node, _chart, _standard|
+          expect(svgs(node).map { |svg| svg[:role] }).to include("img")
+        end
+      end
+
+      it "names the standard in every chart's accessible label" do
+        each_drawn_chart(scan) do |node, _chart, standard|
+          labels = svgs(node).map { |svg| svg[:"aria-label"].to_s }
+
+          expect(labels).to all(match(/\S/))
+          expect(labels).to all(include(Standards::Names.standard(standard)))
+        end
+      end
+
+      it "draws one curve per centile the gem publishes for that chart" do
+        each_drawn_chart(scan) do |node, chart, _standard|
+          expect(curves(node).size).to eq(chart.series.size)
+        end
+      end
+
+      it "marks the plotted point on every chart" do
+        each_drawn_chart(scan) do |node, chart, _standard|
+          expect(chart.point).not_to be_nil
+          expect(points(node).size).to eq(1)
+        end
+      end
+
+      it "marks the point with a circle" do
+        each_drawn_chart(scan) do |node, _chart, _standard|
+          expect(node.all('[data-testid="chart-point"] circle, circle[data-testid="chart-point"]',
+                          visible: :all)).not_to be_empty
+        end
+      end
+
+      it "captions every panel with the chart's citation" do
+        each_drawn_chart(scan) do |node, chart, _standard|
+          expect(node.text).to include(chart.source[:citation])
+        end
+      end
+
+      it "refuses nothing" do
+        section = rendered.find('[data-testid="charts"]')
+
+        expect(section.all('[data-testid="chart-refusal"]', visible: :all)).to be_empty
+      end
+
+      it "discloses the contested dispersion in both Hadlock panels" do
+        sentence = dispersion_detail.split(". ").first
+
+        %i[hadlock_1991_equation hadlock_1991_table].each do |standard|
+          disclosures = panel(standard).all("details", visible: :all)
+
+          expect(disclosures).not_to be_empty
+          expect(disclosures.map { |node| node.text(:all) }.join(" ")).to include(sentence)
+        end
+      end
+
+      it "draws the two Hadlock readings as different curves" do
+        expect(polyline_geometry(:hadlock_1991_equation))
+          .not_to eq(polyline_geometry(:hadlock_1991_table))
+      end
+
+      it "never labels the reading" do
+        expect(last_response.body).not_to match(/\b(SGA|LGA|IUGR|FGR|macrosomia|abnormal)\b/i)
+      end
+    end
+
+    describe "GET /scans/:id with a scan whose measurements the formulas cannot read" do
+      let(:scan) { create(:scan, :partial) }
+
+      before { get "/scans/#{scan.id}" }
+
+      it "still draws every standard's curves" do
+        each_drawn_chart(scan) do |node, chart, _standard|
+          expect(curves(node).size).to eq(chart.series.size)
+        end
+      end
+
+      it "plots no point on the charts it draws" do
+        drawn = 0
+
+        each_drawn_chart(scan) do |node, _chart, _standard|
+          drawn += 1
+          expect(points(node)).to be_empty
+        end
+        expect(drawn).to eq(BIOMETRY.charts.keys.sum { |id| charts_of(gem_chart(scan, id)).size })
+      end
+    end
+
+    describe "GET /scans/:id with a scan earlier than some standards cover" do
+      let(:scan) { create(:scan, ga_days: 70) }
+
+      before { get "/scans/#{scan.id}" }
+
+      def refusing = BIOMETRY.charts.keys.select { |id| gem_chart(scan, id).failure? }
+
+      def drawing = BIOMETRY.charts.keys.select { |id| gem_chart(scan, id).success? }
+
+      it "is a gestation some charts draw and others refuse" do
+        expect(refusing).not_to be_empty
+        expect(drawing).not_to be_empty
+      end
+
+      it "keeps a panel for every standard" do
+        BIOMETRY.charts.each_key do |standard|
+          expect(rendered.all(%([data-testid="chart-#{standard}"]), visible: :all).size).to eq(1)
+        end
+      end
+
+      it "gives the reason in the refusing standard's own panel" do
+        refusing.each do |standard|
+          expect(refusals(panel(standard)).map(&:text).join(" "))
+            .to include(Scans::Reason.call(gem_chart(scan, standard).failure))
+        end
+      end
+
+      it "draws no curves for a standard that refused" do
+        refusing.each do |standard|
+          expect(curves(panel(standard))).to be_empty
+          expect(svgs(panel(standard))).to be_empty
+        end
+      end
+
+      it "still draws the standards whose window covers it" do
+        drawing.each do |standard|
+          expect(refusals(panel(standard))).to be_empty
+          expect(curves(panel(standard)).size).to eq(gem_chart(scan, standard).value!.series.size)
+        end
+      end
+
+      it "shows no failure tag" do
+        expect(rendered.find('[data-testid="charts"]').text).not_to match(/out_of_range/)
+      end
+
+      it "never labels the reading" do
+        expect(last_response.body).not_to match(/\b(SGA|LGA|IUGR|FGR|macrosomia|abnormal)\b/i)
+      end
+    end
+
+    describe "GET /scans/:id/charts/:standard" do
+      let(:scan) { create(:scan) }
+
+      it "responds ok for every chart the gem serves" do
+        BIOMETRY.charts.each_key do |standard|
+          get "/scans/#{scan.id}/charts/#{standard}"
+
+          expect(last_response).to be_ok
+        end
+      end
+
+      it "renders that standard's panel" do
+        BIOMETRY.charts.each_key do |standard|
+          get "/scans/#{scan.id}/charts/#{standard}"
+
+          expect(rendered.all(%([data-testid="chart-#{standard}"]), visible: :all).size).to eq(1)
+        end
+      end
+
+      it "draws the same curves the panel on the scan page draws" do
+        BIOMETRY.charts.each_key do |standard|
+          get "/scans/#{scan.id}/charts/#{standard}"
+          result = gem_chart(scan, standard)
+
+          drawn_panels(standard, result).zip(charts_of(result)) do |node, chart|
+            expect(curves(node).size).to eq(chart.series.size)
+          end
+        end
+      end
+
+      it "cites the standard on its own page" do
+        BIOMETRY.charts.each_key do |standard|
+          get "/scans/#{scan.id}/charts/#{standard}"
+
+          expect(last_response.body).to include(charts_of(gem_chart(scan, standard)).first.source[:citation])
+        end
+      end
+
+      it "never labels the reading" do
+        BIOMETRY.charts.each_key do |standard|
+          get "/scans/#{scan.id}/charts/#{standard}"
+
+          expect(last_response).to be_ok
+          expect(last_response.body).not_to match(/\b(SGA|LGA|IUGR|FGR|macrosomia|abnormal)\b/i)
+        end
+      end
+
+      it "responds 404 for a standard the registry does not serve" do
+        served = BIOMETRY.charts.keys.first
+        get "/scans/#{scan.id}/charts/#{served}"
+        control = last_response.status
+
+        get "/scans/#{scan.id}/charts/banana"
+
+        expect(control).to eq(200)
+        expect(last_response.status).to eq(404)
+      end
+
+      it "responds 404 for a scan that does not exist" do
+        served = BIOMETRY.charts.keys.first
+        get "/scans/#{scan.id}/charts/#{served}"
+        control = last_response.status
+
+        get "/scans/999999/charts/#{served}"
+
+        expect(control).to eq(200)
+        expect(last_response.status).to eq(404)
+      end
+    end
+  end
 end

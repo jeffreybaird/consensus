@@ -1,0 +1,20 @@
+<%# One standard's panel: its chart(s), or the reason there is none. A refused
+    chart keeps its panel — a missing panel reads as a standard never consulted. %>
+<section class="chart-panel" data-testid="chart-<%= standard %>">
+  <h3><%= standard_name(standard) %></h3>
+  <% if result.success? %>
+    <% Array(result.value!).each do |chart| %>
+      <% stratum = chart.chart[:stratum] %>
+      <% if Array(result.value!).length > 1 %>
+        <div data-testid="chart-<%= standard %>-<%= stratum %>">
+          <h4><%= stratum.to_s.capitalize %></h4>
+          <%= erb :"scans/_chart", locals: { chart: chart } %>
+        </div>
+      <% else %>
+        <%= erb :"scans/_chart", locals: { chart: chart } %>
+      <% end %>
+    <% end %>
+  <% else %>
+    <p class="refusal" data-testid="chart-refusal"><%= Scans::Reason.call(result.failure) %></p>
+  <% end %>
+</section>

@@ -1,0 +1,3 @@
+<p><a href="/scans/<%= @scan.id %>">← Scan <%= @scan.ga_text %></a></p>
+<h1><%= standard_name(@standard) %> · <span class="mono"><%= @scan.ga_text %></span></h1>
+<%= erb :"scans/_chart_panel", locals: { standard: @standard, result: @result } %>
