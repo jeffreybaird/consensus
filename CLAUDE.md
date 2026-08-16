@@ -1,9 +1,7 @@
-# CLAUDE.md — Generic Ruby Project (Sinatra + Sequel + SQLite)
+# CLAUDE.md — Consensus (Sinatra + Sequel + SQLite)
 
 Claude Code reads this every session. Follow all rules unless the user overrides for a
-specific task. This is a **generic template** — replace `Consensus` / `consensus` with your real
-module and app names, and adapt the example domain (the `Note` resource, its service objects,
-its routes) to yours.
+specific task.
 
 Detail patterns live in `.claude/`. Load the relevant file when working in that area.
 
@@ -13,10 +11,11 @@ Ruby 3.3+ · **modular Sinatra** (`class App < Sinatra::Base`, served by **Puma*
 `config.ru`) · **Sequel** ORM · **SQLite** (WAL mode, replicated to object storage by
 Litestream). Key conventions: domain logic in **service objects returning Result types**
 (dry-monads), not routes; request context via a hand-rolled **`Current`** module
-(`Current.user` / `Current.account`) — the data boundary, *not* authorization; **plain-Ruby
-policy objects** for authorization; **Faraday** for HTTP; views are **ERB** (no
-Hotwire/Turbo/Stimulus); **RSpec + Rack::Test + Capybara** for tests. Background work, when
-needed, is **Sidekiq** (Redis) — there is none by default.
+(`Current.request_id` — no users or accounts in this app) — the data boundary, *not*
+authorization; views are **ERB** (no Hotwire/Turbo/Stimulus); **RSpec + Rack::Test +
+Capybara** for tests. The **`biometry` gem** (in-process, loaded once at boot) owns all
+clinical computation. Background work, when needed, is **Sidekiq** (Redis) — there is none
+by default, and none planned.
 
 This is deliberately a lean stack: Sinatra gives you routing and little else, so most
 structure here is a convention we impose, not a framework feature. When something isn't
@@ -36,20 +35,49 @@ built in, the honest answer is "plain Ruby + an explicit `require`", not a Rails
 - `.claude/frontend-map.md` — **template**: map your routes, services, ERB views, JS modules
 - `.claude/a11y-audit.md` — WCAG 2.1 AA accessibility audit command
 
-### Optional modules (include only if your app needs them)
-
-- `.claude/multi-tenancy.md` — `account_id` row-level scoping, `Current.account`, test isolation
-- `.claude/rbac.md` — authentication (session + bcrypt), roles on memberships, policy objects
-- `.claude/external-service-integration.md` — wrapping any third-party API behind a Faraday client class
-- `.claude/payment-integration.md` — Stripe billing/subscriptions/checkout + webhooks
-- `.claude/object-storage-integration.md` — S3-compatible blob storage (presigned uploads; store keys, not blobs)
+Deliberately absent: multi-tenancy, authentication/RBAC, payments, object storage and
+external HTTP services are not part of this app; their template modules were removed. The
+`biometry` gem is an in-process path dependency, not an external service — no Faraday
+client, no WebMock, no wrapper class.
 
 ---
 
 ## Project Overview
 
-`Consensus` is a Sinatra web application. Replace this section with your own overview: what the
-app does, who uses it, and the high-level architecture.
+`Consensus` is the web UI for the `biometry` gem (`../rei_calc`, a path gem in the Gemfile):
+fetal biometry from ultrasound measurements. A user enters a scan's measurements (BPD, HC,
+AC, FL in millimetres) and a gestational age; the app shows the estimated fetal weight and
+where it falls on each of the competing growth standards — both Hadlock 1991 readings,
+INTERGROWTH-21st, WHO and NICHD — side by side, with server-rendered SVG growth charts.
+The *disagreement between standards* is the product, not a caveat on it. Scans are saved
+(SQLite) so a visit can be revisited; all clinical computation happens in the gem and is
+recomputed on view, never stored.
+
+The gem is loaded once at boot (`BIOMETRY = Biometry.load`, a frozen thread-safe Context
+shared across requests). See `../rei_calc/docs/LIBRARY.md` for the library API and
+`../rei_calc/docs/CHART_DATA.md` for the chart-data contract.
+
+### Clinical rules (inherited from the gem, enforced here too)
+
+- **No classification labels, ever.** No SGA, LGA, IUGR, macrosomia, abnormal, normal, or
+  any threshold-crossing label — not in views, not in JSON, not as chart shading or
+  threshold lines. The app renders numbers, percentile curves and citations; interpreting
+  them is a clinician's job.
+- **Every number is cited.** A weight or percentile displayed without its standard and
+  paper citation is incomplete. The gem puts provenance on every value; the UI surfaces it.
+- **Refusals are content.** When a chart cannot answer (missing measurement, GA outside
+  its window), render the reason where the reading would have been — never a silently
+  absent row or an empty chart.
+- **No clinical constants in this app.** Every clinical number comes from the gem. If the
+  UI seems to need one, the gem is missing it — stop and say so.
+
+### Data honesty
+
+This app holds **no real patient data** — every `patient_ref` is a synthetic label, and
+that will not change. Because of that, `patient_ref` MAY appear in logs and telemetry.
+In the extremely unlikely event real-world data ever enters this system, that allowance is
+revoked: redact `patient_ref` from every logging/instrumentation call site (grep for
+`patient_ref`) and apply `.claude/observability.md`'s no-PII rule to it.
 
 ### Architecture Summary
 
@@ -62,22 +90,20 @@ app does, who uses it, and the high-level architecture.
   SQLite file. One writer at a time — see `.claude/database.md`.
 - **Background jobs:** none by default. Reach for Sidekiq (Redis) when you need durable
   async; light in-process work can use a thread pool, with the single-writer caveat.
-- **External services:** wrapped behind Faraday client classes (`app/clients/`). Never call
-  a vendor SDK directly outside its client. See `.claude/external-service-integration.md`.
+- **The gem boundary:** `BIOMETRY` (the loaded `Biometry::Context`) is the only door to
+  clinical computation. Services call it; routes and views never require gem internals.
 - **Deployment:** Docker + Puma on a DigitalOcean droplet via the push-button-deploy
   pipeline (Caddy TLS, blue/green, Litestream). See `.claude/deployment.md`.
 
 ### Domain Modules
 
 Business logic lives in service objects and models. Routes never embed business rules or raw
-queries. Common examples:
+queries.
 
-| Area            | Responsibility                                            |
-|-----------------|-----------------------------------------------------------|
-| `Accounts`      | Users, authentication, memberships, invitations, RBAC     |
-| `Notes`         | The example domain resource (replace with your real ones) |
-| `Billing`       | Subscriptions, plans, checkout (if you charge money)      |
-| `Notifications` | Email/push notifications, delivery                        |
+| Area        | Responsibility                                                              |
+|-------------|-----------------------------------------------------------------------------|
+| `Scans`     | The saved scan: measurements, GA, options; create/report/chart services wrapping `BIOMETRY` |
+| `Catalog`   | Read-only pages over `BIOMETRY.catalog`: standards, formulas, citations, known issues |
 
 ---
 
@@ -221,8 +247,8 @@ impersonation context where applicable. This is a plain Sequel table, not a gem.
 
 Authentication = who you are (session + bcrypt). Tenant scoping (`Current.account`) = which
 rows you may touch. Authorization (a policy object) = which actions you may perform. A valid
-scope still needs an authorization check. Enforce in routes **and** re-check in services. See
-`.claude/rbac.md`.
+scope still needs an authorization check. Enforce in routes **and** re-check in services.
+(This app has no authentication; the principle stands for any policy object it grows.)
 
 ---
 

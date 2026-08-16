@@ -44,7 +44,7 @@ Before creating any file, partial, or template, read the existing codebase to un
 
 - How routes map to services and views (thin `get "/notes" do … end` blocks in `app.rb` / `app/routes/*.rb`), where partials live (`views/components/`), how `views/layout.erb` and shared partials are structured.
 - Where CSS is served from (`public/css/app.css`) and, if the optional Tailwind CLI is in use, where its input lives and how the watcher is run.
-- How authentication and the current-tenant lookup work — the `Current` module (`Current.user`, `Current.account`), set in a `before` filter — since per-tenant theming reads from it. See `.claude/multi-tenancy.md`.
+- How authentication and the current-tenant lookup work — the `Current` module (`Current.user`, `Current.account`), set in a `before` filter — since per-tenant theming reads from it.
 
 Follow existing conventions exactly. Do not introduce new organizational patterns unless none exists for the type of thing you are building.
 

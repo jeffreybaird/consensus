@@ -268,7 +268,7 @@ FactoryBot instantiates `Sequel::Model` subclasses like any other object:
 ## 5. External Services — Never Hit Real APIs
 
 Third-party HTTP goes through **Faraday** client classes in `app/clients/`
-(e.g. `Consensus::MediaClient`) — see `.claude/external-service-integration.md`.
+(e.g. `Consensus::MediaClient`). The biometry gem is in-process — no HTTP, no stubbing.
 Block all real outbound HTTP in the suite. Two complementary tools:
 
 - **WebMock** ([github.com/bblimke/webmock](https://github.com/bblimke/webmock),
@@ -453,7 +453,7 @@ considered complete.
 - Happy path — returns `Success(...)`
 - **Every error path** — each `Failure([:tag, ...])` return / raised error
 - **Authorization** — authorized actor succeeds, unauthorized denied (policy
-  objects; see `.claude/rbac.md`)
+  objects)
 - **Tenant / per-user isolation** — an actor in account A cannot read or mutate
   account B's data (see below). This is the highest-value category.
 - Edge cases (empty, nil, boundary values)
@@ -559,25 +559,9 @@ end
 
 ### Tenant / per-user isolation
 
-Express isolation through `Current.account` and account-scoped Sequel datasets
-(see `.claude/multi-tenancy.md`). The assertion that matters: a query scoped to
-one account must never return another account's row.
-
-```ruby
-it "isolates notes across accounts" do
-  account       = create(:account)
-  other_account = create(:account)
-  note = create(:note, account:)
-
-  # The account-scoped finder must not surface another account's record.
-  # Notes.find_for does: account.notes_dataset.with_pk!(id)
-  expect {
-    Notes.find_for(other_account, note.id)
-  }.to raise_error(Sequel::NoMatchingRow)
-end
-```
-
----
+Not applicable: this app is single-tenant with no accounts. If accounts are
+ever added, restore the isolation pattern (account-scoped datasets asserted
+never to return another account's row) before shipping them.
 
 ## 9. CI Gates
 

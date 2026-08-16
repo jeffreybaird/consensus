@@ -230,8 +230,8 @@ Document how auth is enforced at the request layer.
 > **Sinatra:** enforced with `before` filters and helper methods on `class App < Sinatra::Base`
 > (not Rails `before_action`). `Current.user` is loaded from `Rack::Session::Cookie` in a
 > `before` filter and cleared in an `after` filter — `Current` is the **data** boundary, not
-> authorization (see `.claude/multi-tenancy.md`). Authorization is plain-Ruby policy objects in
-> `app/policies/`, invoked through an `authorize!` helper — no Pundit. See `.claude/rbac.md`.
+> authorization. Authorization is plain-Ruby policy objects in
+> `app/policies/` — this app currently has none.
 
 | Filter / helper                      | Applied to                   | Purpose |
 |--------------------------------------|------------------------------|---------|

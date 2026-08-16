@@ -556,7 +556,7 @@ is no Rails executor to clear it for you, so you reset it yourself in filters.
 
 > **Scope ≠ authorization.** `Current` defines the *data boundary* (which tenant's
 > rows you may even see). *Whether this actor may perform this action* is the policy
-> object's job (`.claude/rbac.md`). Never use `Current` as an authorization check.
+> object's job. Never use `Current` as an authorization check.
 
 ```ruby
 # app/current.rb  (thread/fiber-local — no ActiveSupport::CurrentAttributes)
@@ -685,5 +685,5 @@ When adding a feature, verify:
 - [ ] Plan-tier / rollout behavior is gated behind a `flags` entry (`Consensus::Flags`), not scattered plan checks
 - [ ] Background jobs (if any) include `account_id` in args; idempotent + unique; repopulate `Current` in `perform`
 - [ ] `Consensus::ExportAccountData` updated to include the new tenant-scoped table
-- [ ] Authorization is enforced via a policy object (not via `Current`) — see `.claude/rbac.md`
+- [ ] Authorization is enforced via a policy object (not via `Current`) — if the feature needs one
 - [ ] Every new behavior has a test (per CLAUDE.md)

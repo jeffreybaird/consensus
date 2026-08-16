@@ -323,8 +323,8 @@ end
 `Current` is the **data** boundary, not authorization. Scoping answers *which rows is
 this actor allowed to see*; a policy object answers *is this actor allowed to do
 this*. Both belong in the service layer, not the route — the service applies the
-scope and checks the policy, returning `Failure([:forbidden])` when denied. See
-`multi-tenancy.md` for the scoping patterns.
+scope and checks the policy, returning `Failure([:forbidden])` when denied.
+(This app is single-tenant with no auth; the boundary still holds.)
 
 ---
 
@@ -362,6 +362,4 @@ Before committing changes to any route block:
 
 - `architecture-decisions.md` — Result/error tags, audit logging, soft deletes, pagination, side effects after commit
 - `database.md` — Sequel models/datasets, SQLite/WAL single-writer constraints, migrations, Litestream
-- `external-service-integration.md` — Faraday client wrapper pattern for third-party APIs
 - `testing.md` — RSpec + Rack::Test + Capybara patterns, FactoryBot, rolled-back transactions, request/feature specs
-- `multi-tenancy.md` — tenant scoping and dataset patterns (if applicable)
