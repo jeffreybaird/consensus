@@ -10,13 +10,24 @@ This file is the authoritative reference for all frontend work on `<project name
 
 ---
 
-## Identity — fill in
+## Identity — "Reading room"
 
-`<Project name>` is a `<one-sentence description of the product and audience>`.
+`Consensus` is the web UI for the biometry gem: it shows where one fetal weight
+estimate falls on each of the competing growth standards, side by side, for
+clinically-literate users exploring the disagreement between standards.
 
-Aesthetic: `<describe the intended look and feel — e.g., "clean and professional", "warm and editorial", "bold and playful">`. The user should feel `<emotional goal — e.g., "in control", "at home", "delighted">`.
+Aesthetic: **instrument dark** — the register of an ultrasound console or a PACS
+reading room. Near-black surfaces, high-contrast readouts, charts as the hero of
+every screen, measurements displayed like machine values (large numeral, small
+unit). The user should feel they are reading a precise instrument, not a
+marketing page. A **light theme exists for printing and as an explicit toggle** —
+dark is the default, print is always light.
 
-Tone: `<adjectives — e.g., "direct, friendly, confident">`. Not `<what it should NOT feel like>`.
+Tone: precise, cited, unhurried. Not alarming, not reassuring — this interface
+never renders a verdict (see CLAUDE.md clinical rules), so nothing in the visual
+language may imply one: **no red/green on clinical values, no shading of chart
+regions, no "normal range" affordances.** Red belongs to form and system errors
+only.
 
 ---
 
@@ -105,39 +116,85 @@ module.exports = {
 }
 ```
 
-### Surface scale
+### Surface scale (dark default / light theme)
 
-| Token | Purpose | Value |
-|---|---|---|
-| `bg` | Page background | `<oklch value>` |
-| `surface` | Cards, panels | `<oklch value>` |
-| `elevated` | Inputs, dropdowns | `<oklch value>` |
-| `overlay` | Modals, popovers | `<oklch value>` |
+| Token | Purpose | Dark (default) | Light (print + toggle) |
+|---|---|---|---|
+| `bg` | Page background | `#0d0d0d` | `#f9f9f7` |
+| `surface` | Cards, panels, chart surface | `#1a1a19` | `#fcfcfb` |
+| `elevated` | Inputs, dropdowns | `#232321` | `#ffffff` |
+| `overlay` | Modals, popovers | `#2c2c2a` | `#ffffff` |
 
 ### Text scale
 
-| Token | Purpose | Value |
-|---|---|---|
-| `text-primary` | Main readable text | `<oklch value>` |
-| `text-secondary` | Supporting text | `<oklch value>` |
-| `text-muted` | Metadata, labels | `<oklch value>` |
+| Token | Purpose | Dark | Light |
+|---|---|---|---|
+| `text-primary` | Main readable text, readout numerals | `#ffffff` | `#0b0b0b` |
+| `text-secondary` | Supporting text, citations | `#c3c2b7` | `#52514e` |
+| `text-muted` | Metadata, axis labels | `#898781` | `#898781` |
+| `border` | Hairline rings, dividers | `rgba(255,255,255,0.10)` | `rgba(11,11,11,0.10)` |
 
-### Accent / brand — `<tenant-overridable / fixed>`
+### Accent — fixed (single brand)
 
-| Token | Purpose | Value |
-|---|---|---|
-| `accent` | Primary brand color | `<oklch value>` |
-| `accent-hover` | Hover state | `<oklch value>` |
-| `accent-text` | Text on accent backgrounds | `<oklch value>` |
-| `accent-subtle` | Tinted accent background | `<oklch value>` |
+| Token | Purpose | Dark | Light |
+|---|---|---|---|
+| `accent` | Interactive elements, links, focus | `#3987e5` | `#2a78d6` |
+| `accent-hover` | Hover state | `#5598e7` | `#256abf` |
+| `accent-text` | Text on accent backgrounds | `#0d0d0d` | `#ffffff` |
+| `accent-subtle` | Tinted accent background | `rgba(57,135,229,0.15)` | `rgba(42,120,214,0.10)` |
 
-### Status
+### Status — app mechanics ONLY, never clinical values
 
-| Token | Purpose | Value |
-|---|---|---|
-| `success` | Success state | `<oklch value>` |
-| `warning` | Warning state | `<oklch value>` |
-| `error` | Error / destructive state | `<oklch value>` |
+| Token | Purpose | Dark | Light |
+|---|---|---|---|
+| `success` | "Scan saved" confirmation | `#0ca30c` | `#006300` (text) |
+| `error` | Form/system errors, destructive confirm | `#d03b3b` | `#d03b3b` |
+
+No `warning` token: this app has no warning states, and a yellow near clinical
+data reads as a verdict. Status colors always pair with an icon + text — never
+color alone — and are **never applied to a weight, percentile, curve or chart
+region**. There is no token for "abnormal" and none may be added.
+
+### Chart tokens (validated with the dataviz palette validator)
+
+Standard identity — fixed assignment, used for table row markers, chart title
+chips and legends; the same standard is the same hue everywhere, and the
+assignment never re-flows when a chart is missing:
+
+| Token | Standard | Dark | Light |
+|---|---|---|---|
+| `series-intergrowth` | INTERGROWTH-21st | `#3987e5` | `#2a78d6` |
+| `series-hadlock-eq` | Hadlock 1991 (equation) | `#d95926` | `#eb6834` |
+| `series-hadlock-tab` | Hadlock 1991 (table) | `#199e70` | `#1baf7a` |
+| `series-who` | WHO | `#c98500` | `#eda100` |
+| `series-nichd` | NICHD | `#d55181` | `#e87ba4` |
+
+Validated (adjacent pairs, both surfaces): CVD ΔE ≥ 8.4, normal-vision ≥ 19.3,
+all ≥ 3:1 on the dark surface. On the light surface three slots sit below 3:1 —
+the relief rule applies and is satisfied structurally: every colored marker
+always sits beside its visible text label, and the growth table is always
+present. Identity is never color-alone.
+
+Centile curves within one chart are **ordered, not categorical** — one blue
+ramp light→dark with direct labels (P3…P97) at the curve ends; the ramp step
+carries the order, the label carries the identity:
+
+| Token | Centile | Dark | Light |
+|---|---|---|---|
+| `centile-1` (lightest) | outermost high (e.g. P97) | `#b7d3f6` | `#86b6ef` |
+| `centile-2` | | `#6da7ec` | `#5598e7` |
+| `centile-3` (median, 2px) | P50 | `#3987e5` | `#2a78d6` |
+| `centile-4` | | `#256abf` | `#1c5cab` |
+| `centile-5` (darkest) | outermost low (e.g. P3) | `#184f95` | `#0d366b` |
+
+Validated as ordinal ramps in both modes (monotone lightness, adjacent ΔL ≥
+0.06, near-surface end ≥ 2:1). Charts with more published centiles (WHO's nine)
+reuse steps symmetrically around P50 with direct labels doing the work.
+
+Chart chrome: `gridline` `#2c2c2a` / `#e1e0d9` (hairline), `axis` `#383835` /
+`#c3c2b7`. The plotted point is **`text-primary` ink with a 2px `surface` ring
+and a fine crosshair** — maximum contrast, no hue, so the reader's point never
+borrows a color that could read as a verdict.
 
 ```erb
 <%# ✅ semantic token-backed class (defined in public/css/app.css) %>
@@ -160,13 +217,16 @@ Define a small set of semantic font roles as CSS variables. Collapse roles you d
 
 | Role | Variable | Purpose |
 |---|---|---|
-| Display | `--font-display` | `<hero headlines, feature titles>` |
-| Body | `--font-body` | `<prose, descriptions, long-form>` |
-| UI | `--font-ui` | `<nav, buttons, labels, forms>` |
-| Mono | `--font-mono` | `<codes, metadata, timestamps>` |
+| Body / UI | `--font-ui` | everything: nav, prose, labels, forms — `system-ui, -apple-system, "Segoe UI", sans-serif` |
+| Mono | `--font-mono` | measurement readouts, GA strings, chart axis ticks — `ui-monospace, "SF Mono", Menlo, monospace` |
 
-- Always declare **system fallbacks** in the variable default (e.g. `--font-ui: 'Inter', system-ui, sans-serif;`).
-- Body: `<leading, min size — e.g., line-height 1.6, 1rem minimum>`.
+No display or serif face; the instrument register comes from the mono readouts
+and the dark surfaces, not a typeface. Numeric columns (growth table, axis
+ticks) set `font-variant-numeric: tabular-nums`. Readout values are large
+(`1.5–2rem`) with the unit small (`0.75em`, `text-secondary`) beside them.
+
+- Always declare **system fallbacks** in the variable default.
+- Body: line-height 1.6, 1rem minimum; citations may drop to 0.875rem `text-secondary`, never below.
 - For external fonts, put `dns-prefetch` + `preconnect` + `preload as="style"` in `views/layout.erb` before the stylesheet `<link>`; provide a `<noscript>` fallback. Self-hosting under `public/fonts/` avoids the extra origin entirely. Avoid render-blocking.
 
 ---
@@ -294,6 +354,11 @@ Use the right element; let the browser supply roles, focus, and keyboard handlin
 
 ## Dark Mode + Theme Switch **[recommended]**
 
+**Consensus is dark by default**: `:root` carries the dark values,
+`[data-theme="light"]` overrides with the light column, and `@media print`
+forces the light values unconditionally. The snippet below shows the mechanism
+with light-default; invert accordingly.
+
 Theme selection is a **`data-theme` attribute on `<html>`** plus CSS-variable blocks — not a hardcoded class toggle. This keeps tokens as the single switch point and composes cleanly with per-tenant brand overrides (see `.claude/theming.md`).
 
 ```css
@@ -334,29 +399,46 @@ Persist the choice in `localStorage` with a small vanilla JS file served from `p
 
 ---
 
-## Design Tokens & Tone — fill in **[core]**
-
-> Replace this section with your project's concrete decisions.
+## Design Tokens & Tone **[core]**
 
 ### Spacing & layout
-- Base unit: `<e.g., 4px scale>` · Max content width: `<e.g., 1280px>` · Page padding: `<e.g., 1rem mobile / 2rem desktop>`.
+- Base unit: 4px scale (`0.25rem` increments). Max content width: `72rem`; chart
+  pages may go full-width. Page padding: `1rem` mobile / `2rem` desktop.
+- Radius: `0.375rem` on cards and inputs; charts are square-cornered (instrument).
+- Print stylesheet forces the light theme (`@media print` re-declares the light
+  token values), hides nav/actions, one chart per page.
 
 ### Components inventory
-For each reusable component document: purpose, variants, composition rules, skeleton.
-- `<Card — purpose, variants, rules>`
-- `<Button — variants: primary/secondary/ghost/destructive; always <button>/<a>/real form; icon-only needs aria-label>`
+- **Readout** — a measurement or result: large mono value, small unit, label
+  above in `text-muted`. Never colored by its value.
+- **Growth table** — the hero of the scan page: one row per chart reading,
+  standard marker (`series-*` chip) + name, weight ±SD, percentile, type,
+  formula inputs, citation footnote mark. Refusal rows render the reason
+  sentence in `text-secondary` where the numbers would be — same row height,
+  visibly quieter, never yellow/red.
+- **Chart panel** — SVG chart + caption (standard, citation, variant note) +
+  known-issues `<details>` disclosure. `role="img"` with an `aria-label`
+  naming standard, centiles and the plotted point; the growth table is the
+  accessible/data alternative.
+- **Card / Button** — standard variants: primary (accent), secondary (hairline
+  border), destructive (error, confirm step). Always `<button>`/`<a>`/real form;
+  icon-only needs `aria-label`.
 
 ### Tone of voice
-- Principles: `<be direct / be human / be specific in errors>`.
-- Error copy: explain what happened + what to do. Avoid "Something went wrong." Surface service-object `Failure([:tag, …])` results as human sentences, not tags.
+- Principles: precise, cited, calm. Say what the number is and where it came
+  from; never what it means clinically.
+- Error copy: explain what happened + what to do. Surface service-object
+  `Failure([:tag, …])` results as human sentences, not tags. Gem refusals are
+  *content*, not errors — render them in place, in the standard's row/panel.
 
 | Situation | ❌ Don't | ✅ Do |
 |---|---|---|
-| `<login failure>` | `<"Authentication failed">` | `<"No account found with that email">` |
-| `<form validation>` | `<"Invalid input">` | `<"Email must include an @ symbol">` |
+| Chart refusal | "Error: out_of_range" | "NICHD covers 15–40 weeks; this scan is at 13w2d." |
+| Missing measurement | "Invalid input" | "Hadlock needs BPD, HC, AC and FL; this scan has no FL." |
+| Form validation | "Invalid GA" | "Gestational age reads as weeks and days, like 32w0d." |
 
-- Empty states: every list surface has one — encouraging, with a CTA.
-- Buttons: verbs ("Save changes", not "Submit"); sentence case; no "click here".
+- Empty states: every list surface has one — plain, with the create action.
+- Buttons: verbs ("Save scan", "New scan"); sentence case; no "click here".
 
 ---
 
@@ -370,6 +452,16 @@ For each reusable component document: purpose, variants, composition rules, skel
 - Never remove focus outlines without a visible replacement.
 - Never use placeholder-only labels — always a visible `<label>`.
 - Never put business logic (Sequel queries, `Current`/policy checks) in a partial or ERB view — resolve it in the route/service and pass it in as locals.
-- `<Add project-specific rules here>`.
+- Never apply color, iconography or emphasis that implies a clinical verdict:
+  no red/green/amber on weights or percentiles, no shaded "normal" chart
+  regions, no threshold lines, no warning glyphs beside values. (CLAUDE.md
+  clinical rules; the gem property-tests the payloads, the UI must not
+  reintroduce a verdict by stylesheet.)
+- Never render a clinical number without its citation reachable on the same
+  surface.
+- Never let a chart curve color double as a status color; `series-*` and
+  `centile-*` tokens are identity/order only.
+- Print always uses the light theme; never ship a page whose chart is
+  illegible on paper.
 </content>
 </invoke>
