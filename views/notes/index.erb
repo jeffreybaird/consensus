@@ -1,0 +1,19 @@
+<h1>Notes</h1>
+
+<% if defined?(@errors) && @errors %>
+  <div role="alert" data-testid="form-errors">
+    Could not save the note. Check the field below.
+  </div>
+<% end %>
+
+<form method="post" action="/notes" data-testid="new-note-form">
+  <label for="note_body">Note</label>
+  <textarea id="note_body" name="body" required></textarea>
+  <button type="submit">Add note</button>
+</form>
+
+<ul data-testid="notes-list">
+  <% @notes.each do |note| %>
+    <li data-testid="note"><%= note.body %></li>
+  <% end %>
+</ul>

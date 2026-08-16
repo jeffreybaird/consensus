@@ -1,0 +1,8 @@
+:root { --fg: #1a1a1a; --bg: #ffffff; --accent: #2563eb; }
+* { box-sizing: border-box; }
+body { font-family: system-ui, sans-serif; color: var(--fg); background: var(--bg); max-width: 42rem; margin: 2rem auto; padding: 0 1rem; }
+label { display: block; font-weight: 600; margin-bottom: .25rem; }
+textarea { width: 100%; min-height: 4rem; }
+button { background: var(--accent); color: #fff; border: 0; padding: .5rem 1rem; border-radius: .375rem; cursor: pointer; }
+button:focus-visible { outline: 3px solid #93c5fd; outline-offset: 2px; }
+[role="alert"] { color: #b91c1c; margin: 1rem 0; }
