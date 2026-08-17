@@ -180,7 +180,7 @@ button:hover { background: var(--accent-hover); }
 .series-nichd { background: var(--series-nichd); }
 
 /* 7. Charts */
-.charts { display: grid; grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr)); gap: 1.5rem; }
+.charts { display: grid; grid-template-columns: 1fr; gap: 1.5rem; }
 .chart-panel { background: var(--surface); border: 1px solid var(--border); padding: 1rem; }
 .chart-figure { margin: 0; }
 .growth-chart { width: 100%; height: auto; display: block; background: var(--surface); }
