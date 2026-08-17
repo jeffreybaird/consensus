@@ -35,7 +35,10 @@ ENV BUNDLE_PATH="/usr/local/bundle" \
 
 # Gemfile first for layer caching; Gemfile.lock copied when present.
 # .ruby-version is required here too — the Gemfile pins `ruby file: ".ruby-version"`.
+# vendor/ holds the vendored biometry path gem (bin/vendor-biometry), which
+# bundler resolves at install time, so it must exist in this layer.
 COPY Gemfile Gemfile.loc[k] .ruby-version ./
+COPY vendor ./vendor
 RUN bundle install && bundle clean --force
 
 COPY . .
