@@ -1,5 +1,5 @@
 PATH
-  remote: ../rei_calc
+  remote: vendor/biometry
   specs:
     biometry (0.1.0)
       csv (~> 3.3)

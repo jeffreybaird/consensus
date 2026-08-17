@@ -1,0 +1,30 @@
+#!/bin/bash
+# Re-vendor the biometry gem from a local checkout (default ../rei_calc).
+#
+# The gem is vendored because the build (CI, Docker) has no access to the
+# private rei_calc repo. Run this after any gem change, commit the result,
+# and say which gem commit it was synced from.
+set -euo pipefail
+
+SOURCE="${1:-../rei_calc}"
+DEST="$(cd "$(dirname "$0")/.." && pwd)/vendor/biometry"
+
+if [ ! -f "$SOURCE/biometry.gemspec" ]; then
+  echo "error: $SOURCE does not look like the biometry gem (no biometry.gemspec)" >&2
+  exit 1
+fi
+
+mkdir -p "$DEST"
+rsync -a --delete \
+  --include='/lib/***' \
+  --include='/data/***' \
+  --include='/exe/***' \
+  --include='/biometry.gemspec' \
+  --include='/README.md' \
+  --include='/LICENSE*' \
+  --exclude='*' \
+  "$SOURCE/" "$DEST/"
+
+REV=$(git -C "$SOURCE" rev-parse --short HEAD 2>/dev/null || echo unknown)
+DIRTY=$(git -C "$SOURCE" status --porcelain 2>/dev/null | grep -q . && echo " (dirty tree)" || true)
+echo "synced from $REV$DIRTY" | tee "$DEST/VENDORED_FROM"

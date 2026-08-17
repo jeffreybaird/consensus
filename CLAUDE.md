@@ -44,7 +44,9 @@ client, no WebMock, no wrapper class.
 
 ## Project Overview
 
-`Consensus` is the web UI for the `biometry` gem (`../rei_calc`, a path gem in the Gemfile):
+`Consensus` is the web UI for the `biometry` gem (vendored at `vendor/biometry`
+from the private `../rei_calc` repo — re-sync with `bin/vendor-biometry` after
+any gem change; the build has no access to the source repo):
 fetal biometry from ultrasound measurements. A user enters a scan's measurements (BPD, HC,
 AC, FL in millimetres) and a gestational age; the app shows the estimated fetal weight and
 where it falls on each of the competing growth standards — both Hadlock 1991 readings,
