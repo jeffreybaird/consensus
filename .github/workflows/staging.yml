@@ -209,6 +209,27 @@ jobs:
           DATABASE_PATH=${{ vars.DATABASE_PATH }}
           EOF
 
+      # Parse the stack the droplet is about to be handed, on the runner, before
+      # anything here has touched it. Compose only reads compose.override.yaml
+      # when it sits beside compose.yaml, so a malformed overlay stays invisible
+      # to every check that looks at the base file alone and surfaces on the
+      # droplet at `docker compose pull` — three steps after the slot claim has
+      # already run staging-down.sh on whatever pull request held the slot. That
+      # ordering turns a typo in this directory into: previous PR's environment
+      # destroyed, this one never started, slot owned by a deploy that failed.
+      #
+      # Staged into a temp directory in the droplet's layout because the paths
+      # resolve relative to the project directory: `env_file: .env` and the
+      # ./litestream.yml mount are siblings of compose.yaml there, not here.
+      - name: Validate the merged staging compose project
+        run: |
+          d=$(mktemp -d)
+          cp deploy/compose.yaml "$d/"
+          cp deploy/compose.staging.yaml "$d/compose.override.yaml"
+          cp deploy/litestream.staging.yml "$d/litestream.yml"
+          cp .env "$d/"
+          docker compose --project-directory "$d" config -q
+
       # The production deploy REPLACES the shared edge files on every run; a
       # staging deploy must not, and this is the one place the two differ on
       # purpose. Those files configure the proxy EVERY app on the droplet sits

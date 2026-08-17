@@ -22,8 +22,9 @@ Aesthetic: **instrument dark** — the register of an ultrasound console or a PA
 reading room. Near-black surfaces, high-contrast readouts, charts as the hero of
 every screen, measurements displayed like machine values (large numeral, small
 unit). The user should feel they are reading a precise instrument, not a
-marketing page. A **light theme exists for printing and as an explicit toggle** —
-dark is the default, print is always light.
+marketing page. A **dark theme is available as an explicit toggle**; the
+default UI is light (near-white surfaces, the same token structure), and print
+always forces light regardless of the active toggle.
 
 Tone: precise, cited, unhurried. Not alarming, not reassuring — this interface
 never renders a verdict (see CLAUDE.md clinical rules), so nothing in the visual
@@ -118,9 +119,9 @@ module.exports = {
 }
 ```
 
-### Surface scale (dark default / light theme)
+### Surface scale (light default / dark theme)
 
-| Token | Purpose | Dark (default) | Light (print + toggle) |
+| Token | Purpose | Dark (toggle) | Light (default + print) |
 |---|---|---|---|
 | `bg` | Page background | `#0d0d0d` | `#f9f9f7` |
 | `surface` | Cards, panels, chart surface | `#1a1a19` | `#fcfcfb` |
@@ -359,10 +360,10 @@ Use the right element; let the browser supply roles, focus, and keyboard handlin
 
 ## Dark Mode + Theme Switch **[recommended]**
 
-**Consensus is dark by default**: `:root` carries the dark values,
-`[data-theme="light"]` overrides with the light column, and `@media print`
-forces the light values unconditionally. The snippet below shows the mechanism
-with light-default; invert accordingly.
+**Consensus is light by default**: `:root` carries the light values,
+`[data-theme="dark"]` overrides with the dark column, and `@media print`
+forces the light values unconditionally regardless of the active toggle. The
+snippet below shows the mechanism with light-default, matching this app.
 
 Theme selection is a **`data-theme` attribute on `<html>`** plus CSS-variable blocks — not a hardcoded class toggle. This keeps tokens as the single switch point and composes cleanly with per-tenant brand overrides (see `.claude/theming.md`).
 
