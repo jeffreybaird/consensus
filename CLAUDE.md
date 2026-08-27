@@ -45,7 +45,7 @@ client, no WebMock, no wrapper class.
 ## Project Overview
 
 `Consensus` is the web UI for the `biometry` gem (vendored at `vendor/biometry`
-from the private `../rei_calc` repo — re-sync with `bin/vendor-biometry` after
+from the private `../biometry` repo — re-sync with `bin/vendor-biometry` after
 any gem change; the build has no access to the source repo):
 fetal biometry from ultrasound measurements. A user enters a scan's measurements (BPD, HC,
 AC, FL in millimetres) and a gestational age; the app shows the estimated fetal weight and
@@ -56,8 +56,8 @@ The *disagreement between standards* is the product, not a caveat on it. Scans a
 recomputed on view, never stored.
 
 The gem is loaded once at boot (`BIOMETRY = Biometry.load`, a frozen thread-safe Context
-shared across requests). See `../rei_calc/docs/LIBRARY.md` for the library API and
-`../rei_calc/docs/CHART_DATA.md` for the chart-data contract.
+shared across requests). See `../biometry/docs/LIBRARY.md` for the library API and
+`../biometry/docs/CHART_DATA.md` for the chart-data contract.
 
 ### Clinical rules (inherited from the gem, enforced here too)
 

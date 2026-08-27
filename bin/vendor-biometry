@@ -1,12 +1,12 @@
 #!/bin/bash
-# Re-vendor the biometry gem from a local checkout (default ../rei_calc).
+# Re-vendor the biometry gem from a local checkout (default ../biometry).
 #
 # The gem is vendored because the build (CI, Docker) has no access to the
-# private rei_calc repo. Run this after any gem change, commit the result,
+# private biometry repo. Run this after any gem change, commit the result,
 # and say which gem commit it was synced from.
 set -euo pipefail
 
-SOURCE="${1:-../rei_calc}"
+SOURCE="${1:-../biometry}"
 DEST="$(cd "$(dirname "$0")/.." && pwd)/vendor/biometry"
 
 if [ ! -f "$SOURCE/biometry.gemspec" ]; then

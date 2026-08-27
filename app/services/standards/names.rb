@@ -2,7 +2,7 @@
 
 module Standards
   # Display names for the gem's identifiers. The gem deliberately returns ids
-  # and citations, never labels (../rei_calc/docs/LIBRARY.md) — these are this
+  # and citations, never labels (../biometry/docs/LIBRARY.md) — these are this
   # app's labels, presentation only, keyed by the catalog's ids. An unknown id
   # falls back to a readable spelling rather than raising: a new chart in the
   # gem must not take the page down.

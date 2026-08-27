@@ -12,7 +12,7 @@ Gem::Specification.new do |spec|
   spec.description = 'Reports fetal measurements against published dating, EFW and growth ' \
                      'standards. Every value names the standard and formula that produced it. ' \
                      'No classification labels are ever emitted.'
-  spec.homepage = 'https://github.com/jeffreybaird/rei_calc'
+  spec.homepage = 'https://github.com/jeffreybaird/biometry'
   spec.license = 'MIT'
   spec.required_ruby_version = '~> 3.3'
 

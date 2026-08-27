@@ -8,7 +8,7 @@ require_relative "database"
 
 # The gem boundary: read data/ once, at boot, into a frozen Context every
 # request and thread shares. Raises here — before anything serves — if the
-# gem's reference data is unverified or malformed. See ../rei_calc/docs/LIBRARY.md.
+# gem's reference data is unverified or malformed. See ../biometry/docs/LIBRARY.md.
 BIOMETRY = Biometry.load
 
 require_relative "../app/current"
