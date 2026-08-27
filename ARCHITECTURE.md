@@ -8,7 +8,7 @@ needs to understand *why* the code is shaped the way it is. Pair this with
 ## The one-sentence model
 
 Consensus is a thin, honest **presentation layer** over one clinical library
-[https://github.com/jeffreybaird/biometry/](`biometry`). It persists what a user typed and recomputes every clinical value
+[https://github.com/jeffreybaird/biometry](biometry). It persists what a user typed and recomputes every clinical value
 on view.
 
 ## Boot order
