@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Consensus</title>
     <script>
-      // Stamp the saved theme before first paint so a light-theme reader
-      // never gets a dark flash. Behavior lives in /js/theme.js.
+      // Stamp the saved theme before first paint so a dark-theme reader
+      // never gets a light flash. Behavior lives in /js/theme.js.
       try { var t = localStorage.getItem("theme");
             if (t) document.documentElement.setAttribute("data-theme", t); } catch (e) {}
     </script>
@@ -18,7 +18,7 @@
       <a href="/" class="brand">Consensus</a>
       <nav>
         <a href="/standards">Standards</a>
-        <button type="button" data-theme-toggle aria-label="Light theme" aria-pressed="false">◐</button>
+        <button type="button" data-theme-toggle aria-label="Light theme" aria-pressed="true">◐</button>
       </nav>
     </header>
     <main>

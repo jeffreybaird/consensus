@@ -11,8 +11,8 @@ renders which view, and hangs which `data-testid` hooks.
 - **Server:** modular Sinatra (`App` in `app.rb`), ERB views under `views/`,
   escape_html on. No Hotwire/Turbo/Stimulus.
 - **CSS:** one hand-written token layer, `public/css/app.css` — the "Reading
-  room" design system (`.claude/design-system.md`). Dark default;
-  `[data-theme="light"]` and `@media print` override.
+  room" design system (`.claude/design-system.md`). Light default;
+  `[data-theme="dark"]` opts in, `@media print` always forces light.
 - **JS:** one vanilla module, `public/js/theme.js` (theme toggle persistence).
   Nothing else; charts are server-rendered SVG.
 - **Domain:** the `biometry` gem via the boot-time `BIOMETRY` context; app
