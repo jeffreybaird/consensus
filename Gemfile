@@ -16,7 +16,6 @@ gem "sequel", "~> 5.90"                          # ORM + migrations
 gem "sqlite3", "~> 2.6"                          # the only DB backend
 gem "rake", "~> 13.2"                            # `rake db:migrate` (the deploy gate)
 gem "dry-monads", "~> 1.8", require: "dry/monads" # Success/Failure Results
-gem "faraday", "~> 2.13"                         # HTTP client for service wrappers
 # Vendored (bin/vendor-biometry): the build has no access to the private
 # biometry repo, so the gem ships inside this one. Re-sync after gem changes.
 gem "biometry", path: "vendor/biometry"
