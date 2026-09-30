@@ -58,7 +58,7 @@ module Scans
 
     def fallback(tag, details)
       detail = details.is_a?(Hash) ? details.map { |k, v| "#{k}: #{v}" }.join(", ") : details
-      "Could not be read (#{tag.to_s.tr('_', ' ')}#{detail ? " — #{detail}" : ''})."
+      "Could not be read (#{tag.to_s.tr('_', ' ')}#{" — #{detail}" if detail})."
     end
 
     def kinds(list) = Array(list).map { |kind| kind.to_s.upcase }.join(", ")

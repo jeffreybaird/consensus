@@ -9,9 +9,9 @@ module Current
     def request_id = store[:request_id]
 
     # Ruby forbids endless setter methods, so these stay classic.
-    def user=(value)    ; store[:user] = value        ; end
-    def account=(value) ; store[:account] = value      ; end
-    def request_id=(id) ; store[:request_id] = id      ; end
+    def user=(value); store[:user] = value; end
+    def account=(value); store[:account] = value; end
+    def request_id=(id); store[:request_id] = id; end
 
     def reset!
       Thread.current[:current_attributes] = {}

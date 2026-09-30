@@ -1,0 +1,92 @@
+# RuboCop config for Consensus. Run: bundle exec rubocop
+#
+# Tuned to the code that already exists — modular Sinatra, service objects with
+# a single #call, endless methods, dry-monads. The goal is a lint gate that
+# catches real problems, not a fight with the house style.
+
+AllCops:
+  TargetRubyVersion: 3.3
+  NewCops: enable
+  SuggestExtensions: false
+  Exclude:
+    - "vendor/**/*"
+    - "db/**/*"
+    - "bin/**/*"
+    - "node_modules/**/*"
+    # spec/ is owned by the spec-writer role (hook-enforced) and gated by rspec,
+    # not the lint gate. Keep RuboCop off it so the two gates stay separate.
+    - "spec/**/*"
+
+# --- Layout / metrics: this app favors compact, readable service objects.
+
+Metrics/MethodLength:
+  Max: 20
+
+Metrics/AbcSize:
+  Max: 35   # chart_view and friends are lambda-heavy SVG geometry, not branchy logic
+
+Metrics/BlockLength:
+  # Sinatra route blocks and RSpec example groups are legitimately long.
+  Exclude:
+    - "app.rb"
+    - "spec/**/*"
+    - "config/**/*"
+
+Metrics/ClassLength:
+  # app.rb is the single Sinatra app — routes + presentation helpers in one class.
+  Exclude:
+    - "app.rb"
+
+# Sinatra's `configure`/`helpers` blocks are the idiomatic home for app constants
+# (PAGE_SIZE, CANONICAL_ID, chart geometry) — they are not runtime-redefined.
+Lint/ConstantDefinitionInBlock:
+  Exclude:
+    - "app.rb"
+
+Layout/LineLength:
+  Max: 100
+
+# --- Style choices already made across the codebase.
+
+Style/Documentation:
+  # Classes are documented with intent comments, not enforced doc blocks.
+  Enabled: false
+
+Style/StringLiterals:
+  EnforcedStyle: double_quotes
+
+Style/FrozenStringLiteralComment:
+  Enabled: true
+
+# Endless methods are used deliberately (helpers, accessors); allow them.
+Style/EndlessMethod:
+  Enabled: false
+
+# Compact single-line defs are house style — most accessors are endless one-liners,
+# and Current's setters stay classic `def x=(v); ...; end` (Ruby forbids endless setters).
+Style/SingleLineMethods:
+  Enabled: false
+
+Layout/EmptyLineBetweenDefs:
+  AllowAdjacentOneLineDefs: true
+
+# Gem identifiers carry trailing digits (intergrowth21, hadlock_1991) — they mirror
+# the biometry catalog ids and must not be renamed for a naming cop.
+Naming/VariableNumber:
+  Enabled: false
+
+# The Gemfile is grouped by role (framework, then infra, then Results), not
+# alphabetized — keep that reading order.
+Bundler/OrderedGems:
+  Enabled: false
+
+# config/environment.rb keeps an explicit `.sort` on its require globs to document
+# the deterministic boot order, even though Dir.glob already sorts.
+Lint/RedundantDirGlobSort:
+  Enabled: false
+
+# --- Specs are owned by the spec-writer role; lint them lightly.
+
+Metrics/ModuleLength:
+  Exclude:
+    - "spec/**/*"
