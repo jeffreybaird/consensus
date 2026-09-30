@@ -8,8 +8,8 @@ needs to understand *why* the code is shaped the way it is. Pair this with
 ## The one-sentence model
 
 Consensus is a thin, honest **presentation layer** over one clinical library
-[https://github.com/jeffreybaird/biometry](biometry). It persists what a user typed and recomputes every clinical value
-on view.
+([biometry](https://github.com/jeffreybaird/biometry)). It persists what a user
+typed and recomputes every clinical value on view.
 
 ## Boot order
 
@@ -34,10 +34,12 @@ Two ordering facts matter:
   `Biometry::Context` shared across every request and Puma thread. If the gem's
   reference data is unverified or malformed, the process dies at boot — before
   it can serve a single wrong number.
-- **Models load after the DB connects and migrates.** A `Sequel::Model`
-  introspects its table at require-time, so the schema must already exist. In
-  tests, `spec_helper.rb` migrates the disposable test DB *before* requiring the
-  app for exactly this reason.
+- **Models load after the DB connects, and expect the schema to already exist.**
+  Boot connects but does not migrate — you run `rake db:migrate` yourself (the
+  deploy pipeline runs it as a gated step before traffic). A `Sequel::Model`
+  introspects its table at require-time, so the schema must be present. In tests,
+  `spec_helper.rb` migrates the disposable test DB *before* requiring the app for
+  exactly this reason.
 
 ## Request lifecycle
 
