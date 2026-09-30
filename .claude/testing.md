@@ -4,8 +4,9 @@ Load this file when writing tests, setting up test infrastructure, or reviewing
 test coverage. Generic Ruby template for **modular Sinatra + Sequel + SQLite**.
 
 > **Baseline:** Ruby 3.3+ · RSpec · Rack::Test (request specs drive `App`) ·
-> Capybara with the rack-test driver (feature/E2E) · FactoryBot · WebMock/VCR
-> (HTTP) · data-testid selectors.
+> Capybara with the rack-test driver (feature/E2E) · FactoryBot · data-testid
+> selectors. There is **no** WebMock/VCR: the only dependency is the in-process
+> `biometry` gem, so the suite makes no external HTTP calls to stub.
 
 Maturity tags: **[stable]** = mature, safe to rely on · **[active]** =
 maintained, evolving · **[optional]** = adopt only if the need exists.
@@ -83,101 +84,82 @@ implementation makes them pass (directly or via `implementer` slices) →
 
 ## 2. Test Layout
 
+The real layout (this app has no models/policies/clients specs — the one model
+is covered through its service and request specs, there are no policy objects,
+and there are no external clients):
+
 ```
 spec/
-├── models/          # Sequel::Model validations, datasets, associations
-├── services/        # service objects: happy + error + authz + isolation
+├── services/        # service objects: happy + error paths (Scans::*, Standards::*)
 ├── requests/        # full-stack route behavior, App via Rack::Test; fast
-├── features/        # Capybara feature specs (rack-test driver); no JS by default
-├── policies/        # policy-object specs (app/policies/*_policy.rb)
-├── clients/         # Faraday client specs (WebMock/VCR)
-├── factories/       # FactoryBot definitions
-├── support/         # shared contexts, helpers, WebMock/VCR config
+├── features/        # Capybara feature specs (rack-test driver); no JS
+├── factories/       # FactoryBot definitions (scans.rb — the one factory)
+├── support/         # shared config + gem fixtures
 │   ├── factory_bot.rb
-│   ├── capybara.rb
-│   ├── rack_test.rb
-│   ├── vcr.rb
-│   └── webmock.rb
-├── fixtures/
-│   └── vcr_cassettes/
-│       └── webhooks/
-│           ├── payment_succeeded.yml
-│           └── asset_ready.yml
+│   └── biometry_charts.rb
 └── spec_helper.rb
 ```
 
 There is no `rails_helper` — the whole harness lives in **`spec_helper.rb`**. It
-boots the modular app, migrates a **fresh** SQLite test database with
-`Sequel::Migrator` before the suite, and wraps every example in a transaction
-that is rolled back afterward (Sequel's equivalent of Rails'
-transactional-fixtures). See `.claude/database.md` for Sequel/SQLite/Litestream
-specifics.
+migrates a **fresh** SQLite test database with `Sequel::Migrator` *before* the
+app loads, then wraps every example in a transaction that is rolled back
+afterward (Sequel's equivalent of Rails' transactional-fixtures). The
+migrate-before-require order matters: a `Sequel::Model` introspects its table at
+require-time, so the schema must already exist when `config/environment` loads
+the models. See `.claude/database.md` for Sequel/SQLite/Litestream specifics.
 
 ```ruby
 # spec/spec_helper.rb
-ENV["APP_ENV"] = "test"
+ENV["RACK_ENV"] = "test"
+# Isolated, disposable test DB — recreated from migrations before every run.
+ENV["DATABASE_PATH"] ||= File.expand_path("../db/test.sqlite3", __dir__)
+File.delete(ENV["DATABASE_PATH"]) if File.exist?(ENV["DATABASE_PATH"])
 
-require "sequel"
-require_relative "../config/database"   # defines the global DB (test SQLite file)
-require_relative "../app"               # class App < Sinatra::Base
+# Migrate BEFORE the app loads (models introspect their tables at require-time):
+# connect, migrate, THEN load the models + app via config/environment.
+require_relative "../config/database"
+Sequel.extension :migration
+Sequel::Migrator.run(DB, File.expand_path("../db/migrate", __dir__))
 
-require "rspec"
+require_relative "../config/environment"   # BIOMETRY, models, services, App
+
 require "rack/test"
 require "capybara/rspec"
-require "factory_bot"
-
-# Build the test schema from scratch before anything runs.
-Sequel.extension :migration
-DB.drop_table?(:schema_info)            # start clean; the test DB is disposable
-Sequel::Migrator.run(DB, File.expand_path("../db/migrate", __dir__))
+Capybara.app = App
 
 Dir[File.expand_path("support/**/*.rb", __dir__)].sort.each { |f| require f }
 
-RSpec.configure do |config|
-  config.include FactoryBot::Syntax::Methods
-
-  # Derive :type from the directory (no rspec-rails to infer it for us).
-  config.define_derived_metadata(file_path: %r{/spec/requests/}) { |m| m[:type] = :request }
-  config.define_derived_metadata(file_path: %r{/spec/features/}) { |m| m[:type] = :feature }
-
-  # Every example runs inside a transaction rolled back at the end.
-  # auto_savepoint: true turns transactions inside the code-under-test into
-  # savepoints, so their COMMIT/ROLLBACK nests instead of ending the outer one.
-  config.around(:each) do |example|
-    DB.transaction(rollback: :always, auto_savepoint: true) { example.run }
-  end
-end
-```
-
-```ruby
-# spec/support/rack_test.rb — drive the modular Sinatra app in request specs
-require "rack/test"
-
 module RequestHelpers
   include Rack::Test::Methods
-
-  # Rack::Test needs an `app`; point it at the modular Sinatra base class.
-  def app
-    App
-  end
-
-  # Log in through the real route so the app's before filter sets Current.user
-  # exactly as in production — do not poke session internals from the spec.
-  def sign_in(user, password: "supers3cret!")
-    post "/login", email: user.email, password: password
-  end
+  def app = App
 end
 
 RSpec.configure do |config|
+  config.include FactoryBot::Syntax::Methods
   config.include RequestHelpers, type: :request
+  config.include RequestHelpers, type: :feature
+
+  # Every example runs inside a transaction rolled back at the end — fast,
+  # isolated, and safe against SQLite's single writer (one connection throughout).
+  config.around(:each) do |example|
+    DB.transaction(rollback: :always, savepoint: true) { example.run }
+  end
+
+  config.order = :random
+  config.expect_with(:rspec) { |c| c.syntax = :expect }
 end
 ```
+
+`savepoint: true` turns a transaction opened by the code-under-test into a
+savepoint, so its COMMIT/ROLLBACK nests inside the example's outer transaction
+instead of ending it. This app has **no** `sign_in`/login helper — it has no
+authentication; a request spec just drives the route directly.
 
 The transaction-per-example strategy shares **one** SQLite connection across the
 spec and the in-process request, so both see the same uncommitted data. A
-real-browser `:js` spec (Section 3) runs the app in a separate thread with its
-own connection and cannot see that transaction — clean those with an explicit
-row-delete `after` hook instead of relying on rollback.
+real-browser `:js` spec would run the app in a separate thread with its own
+connection and could not see that transaction — but there are no `:js` specs
+here (no client JS beyond the theme toggle).
 
 ---
 
@@ -229,133 +211,74 @@ Capybara: [github.com/teamcapybara/capybara](https://github.com/teamcapybara/cap
 
 ## 4. Factories (FactoryBot)
 
-Use [`factory_bot`](https://github.com/thoughtbot/factory_bot) (`~> 6.4`) —
+Use [`factory_bot`](https://github.com/thoughtbot/factory_bot) (`~> 6.5`) —
 `[stable]`. There is no `factory_bot_rails`, so wire definition loading yourself
 (shown below) and `include FactoryBot::Syntax::Methods` (done in `spec_helper`).
-Provide factories for the core graph: account/tenant, user,
-membership-with-role, the example `note` resource, and resources carrying
-external provider ids.
+This app persists exactly one entity — the saved `Scan` — so there is exactly
+**one** factory. Vary what was recorded with **traits**, not new factories.
 
 `build` vs `create`: prefer **`build`** (in-memory, no DB) for unit specs that
 don't need persistence; use **`create`** only when the record must exist in the
-DB (request/feature specs, association lookups). `build_stubbed` is the fastest
-when you need a record with an id but no DB write.
+DB (request/feature specs). `build_stubbed` is the fastest when you need a record
+with an id but no DB write.
 
 ```ruby
 # spec/support/factory_bot.rb
 require "factory_bot"
 FactoryBot.definition_file_paths = [File.expand_path("../factories", __dir__)]
+
+# Sequel::Model persists with #save, not ActiveRecord's #save!.
+FactoryBot.define { to_create(&:save) }
+
 FactoryBot.find_definitions
 ```
 
 ```ruby
-# spec/factories/accounts.rb
+# spec/factories/scans.rb — the only factory. Measurements are millimetres,
+# exactly as Biometry::Measurement takes them; traits only vary what was
+# recorded, never make a clinical claim about which formula can read the set.
 FactoryBot.define do
-  factory :account do                      # the tenant
-    sequence(:name) { |n| "Test Org #{n}" }
-    sequence(:slug) { |n| "test-org-#{n}" }
-  end
+  factory :scan do
+    bpd_mm     { 81.0 }
+    hc_mm      { 296.0 }
+    ac_mm      { 279.0 }
+    fl_mm      { 61.0 }
+    ga_days    { 224 }
+    scanned_on { Date.today }
 
-  factory :user do
-    sequence(:email) { |n| "user-#{n}@example.com" }
-    password { "supers3cret!" }            # the model's password= hashes via bcrypt
-  end
+    # Only one measurement recorded — some formulas will refuse this scan;
+    # which ones is the gem's business, not the factory's.
+    trait :partial do
+      hc_mm { nil }
+      ac_mm { nil }
+      fl_mm { nil }
+    end
 
-  factory :membership do
-    user
-    account
-    role { :editor }
-
-    trait(:admin)  { role { :admin } }
-    trait(:viewer) { role { :viewer } }
-  end
-
-  # The example domain resource.
-  factory :note do
-    account
-    association :author, factory: :user
-    sequence(:title) { |n| "Note #{n}" }
-    body { "…" }
-  end
-
-  # Resource carrying external provider ids (media/payment/etc.)
-  factory :media_asset do
-    account
-    sequence(:title) { |n| "Asset #{n}" }
-    sequence(:provider_asset_id)    { |n| "asset_#{n}" }
-    sequence(:provider_playback_id) { |n| "playback_#{n}" }
-    provider_status { "ready" }
-
-    trait(:preparing) { provider_status { "preparing" } }
-  end
-
-  factory :subscription do
-    account
-    user
-    sequence(:provider_subscription_id) { |n| "sub_#{n}" }
-    status { :active }
+    trait :labelled do
+      sequence(:patient_ref) { |n| "REF-#{n}" }
+    end
   end
 end
 ```
 
-Use **traits** for variation (roles, statuses) rather than separate factories.
 FactoryBot instantiates `Sequel::Model` subclasses like any other object:
-`build` calls `.new`, `create` calls `.save`.
+`build` calls `.new`, `create` runs the `to_create(&:save)` hook above.
 
 ---
 
-## 5. External Services — Never Hit Real APIs
+## 5. External Services — Not Applicable Here
 
-Third-party HTTP goes through **Faraday** client classes in `app/clients/`
-(e.g. `Consensus::MediaClient`). The biometry gem is in-process — no HTTP, no stubbing.
-Block all real outbound HTTP in the suite. Two complementary tools:
+This app has **no external services** to stub. Its only dependency for clinical
+computation is the `biometry` gem, which is a vendored, in-process path
+dependency (`require`, not a network hop) — so there is no Faraday client, no
+`app/clients/`, no WebMock, and no VCR in the suite, and none belong here. The
+gem is exercised directly through the service and request specs.
 
-- **WebMock** ([github.com/bblimke/webmock](https://github.com/bblimke/webmock),
-  `~> 3.23`) — `[stable]`. Disables real connections; stub specific
-  request/response pairs explicitly.
-- **VCR** ([github.com/vcr/vcr](https://github.com/vcr/vcr), `~> 6.3`) —
-  `[stable]`. Records a real interaction once into a "cassette" (YAML) and
-  replays it thereafter. Best for integration specs against a real provider's
-  shape.
-
-```ruby
-# spec/support/webmock.rb — block ALL real HTTP up front
-require "webmock/rspec"
-WebMock.disable_net_connect!(allow_localhost: true)
-```
-
-```ruby
-# spec/support/vcr.rb
-require "vcr"
-VCR.configure do |c|
-  c.cassette_library_dir = "spec/fixtures/vcr_cassettes"
-  c.hook_into :webmock
-  c.filter_sensitive_data("<API_KEY>") { ENV["MYAPP_API_KEY"] }  # never record secrets
-  c.configure_rspec_metadata!
-end
-```
-
-Two valid strategies — pick per spec:
-
-| Strategy                    | When                                                      |
-|-----------------------------|-----------------------------------------------------------|
-| Stub the **client class**   | Unit specs of code that calls your `Consensus::MediaClient`; fast, no HTTP layer involved |
-| Stub the **HTTP layer**     | Verifying the client itself builds the right Faraday request / parses the response (WebMock or VCR) |
-
-```ruby
-# Stub the client class (unit-level):
-media = instance_double(Consensus::MediaClient,
-                        get_asset: { duration: 120.5, max_resolution: "1080p" })
-allow(Consensus::MediaClient).to receive(:new).and_return(media)
-
-# Or replay a recorded interaction (integration-level):
-it "fetches the asset", :vcr do   # uses cassette named after the example
-  expect(Consensus::MediaClient.new.get_asset("asset_123")).to include(status: "ready")
-end
-```
-
-Rule: **no external API call ever fires for real in the suite**, and **no secret
-is recorded into a cassette** (filter it).
+The moment a real external HTTP dependency is ever added (it isn't planned), the
+rule returns in full: wrap it in a Faraday client class, block all real outbound
+HTTP in the suite (WebMock), replay recorded interactions where useful (VCR), and
+never record a secret into a cassette. Until then, this section is a placeholder,
+not a description of anything in the repo.
 
 ---
 
@@ -385,40 +308,27 @@ A full feature spec (rack-test driver, no JS) drives the server-rendered flow
 through those selectors:
 
 ```ruby
-# spec/features/managing_notes_spec.rb
+# spec/features/browsing_standards_spec.rb — no login: this app has no auth.
 require "spec_helper"
 
-RSpec.feature "Managing notes", type: :feature do
-  let(:account) { create(:account) }
-  let(:user)    { create(:user) }
-  before { create(:membership, user:, account:, role: :editor) }
+RSpec.feature "Browsing the standards catalog", type: :feature do
+  scenario "a user follows the navigation from a saved scan to the catalog" do
+    scan = create(:scan)
 
-  scenario "an editor creates a note" do
-    # log in through the real form — no JS, rack-test in-process
-    visit "/login"
-    fill_in "email",    with: user.email
-    fill_in "password", with: "supers3cret!"
-    click_button "Sign in"
+    visit "/scans/#{scan.id}"
+    find('a[href="/standards"]').click
 
-    visit "/notes"
-    expect(page).to have_css('[data-testid="empty-state"]')
-
-    click_link "New note"
-    fill_in "note[title]", with: "Write the spec"
-    click_button "Save"
-
-    expect(page).to have_css('[data-testid="note-list"]')
-    expect(page).to have_css('[data-testid^="note-"]', text: "Write the spec")
+    expect(page).to have_current_path("/standards")
+    expect(page).to have_css('[data-testid="growth-standards"]')
+    expect(page).to have_css('[data-testid="efw-formulas"]')
   end
 end
 ```
 
-Naming convention for `data-testid` values:
-- Actions: `delete-note-{id}`, `subscribe-btn`, `save-resource-{id}`
-- Containers: `note-list`, `resource-list`, `saved-items`
-- Items: `note-{id}`, `resource-{id}`, `user-{id}`
-- States: `empty-state`, `loading-state`, `error-state`
-- Navigation: `nav-admin`, `nav-content`, `nav-analytics`
+Naming convention for `data-testid` values (use the real domain vocabulary):
+- Containers: `growth-standards`, `efw-formulas`, `dating-methods`
+- Items: `standard-{id}` (e.g. `standard-hadlock_1991_equation`), `scan-{id}`
+- States: `empty-state`, `error-state`
 
 ---
 
@@ -478,62 +388,64 @@ end
 For every new feature, ALL applicable categories below are required before it is
 considered complete.
 
-### Models / data objects
+### Models / data objects (`Scan`)
 - Valid attrs → valid
 - Missing required fields → invalid with the expected error (`validation_helpers`
-  `validates_presence`, message `"is not present"`)
-- Invalid values → invalid
-- Unique constraint surfaced — `validates_unique` on save, or a DB-level unique
-  index raising `Sequel::UniqueConstraintViolation`
-- Each **dataset method / scope** returns the right set (and a soft-delete model
-  excludes `deleted_at`-set rows by default; `with_deleted` includes them)
+  `validates_presence` on `ga_days`/`scanned_on`)
+- Out-of-range / non-positive values → invalid (`ga_days` in `0..350`, each
+  measurement `> 0`)
+- Each **dataset method** returns the right set — `recent` ordering, and `page`
+  clamped (`per` to `1..100`, page number to `1..10_000`)
+
+> This app has no unique constraints and no soft delete on `Scan`. If a model
+> ever grows either, add the matching checks (a `validates_unique` /
+> `Sequel::UniqueConstraintViolation` case; a soft-delete dataset that excludes
+> `deleted_at`-set rows by default, with a `with_deleted` variant).
 
 ### Services / business logic
 - Happy path — returns `Success(...)`
-- **Every error path** — each `Failure([:tag, ...])` return / raised error
-- **Authorization** — authorized actor succeeds, unauthorized denied (policy
-  objects)
-- **Tenant / per-user isolation** — an actor in account A cannot read or mutate
-  account B's data (see below). This is the highest-value category.
-- Edge cases (empty, nil, boundary values)
+- **Every error path** — each `Failure([:tag, ...])` return (e.g. the create
+  service's `[:validation, errors]` and `[:error, message]`)
+- Edge cases (empty, nil, boundary values; hostile Rack params — an array/hash
+  where a String is expected must degrade to a validation failure, never a 500)
 
-A service spec exercising the first three:
+> Authorization and tenant-isolation categories do **not** apply here — this app
+> has no accounts, users, or policy objects. If it ever grows them, they become
+> required (an authorized actor succeeds, an unauthorized one is denied; an actor
+> in account A can never read or mutate account B's rows — the highest-value
+> category once tenancy exists).
+
+A service spec exercising the happy path and an error path:
 
 ```ruby
-# spec/services/notes/create_spec.rb
+# spec/services/scans/create_spec.rb
 require "spec_helper"
 
-RSpec.describe Notes::Create do
-  let(:account) { create(:account) }
-  let(:author)  { create(:user) }
-  before { create(:membership, user: author, account:, role: :editor) }
-
+RSpec.describe Scans::Create do
   describe ".call" do
-    it "creates a note scoped to the account (happy path)" do
-      result = described_class.call(account:, author:, params: { title: "Draft", body: "…" })
+    it "creates a scan from valid form params (happy path)" do
+      result = described_class.call(
+        "ga" => "32w0d", "bpd" => "81", "hc" => "296", "ac" => "279", "fl" => "61"
+      )
 
       expect(result).to be_success
-      note = result.value!
-      expect(note.account_id).to eq(account.id)
-      expect(Note.where(account_id: account.id).count).to eq(1)
+      expect(result.value!).to be_a(Scan)
+      expect(Scan.count).to eq(1)
     end
 
-    it "returns a tagged Failure on a blank title (nothing persisted)" do
-      result = described_class.call(account:, author:, params: { title: "" })
+    it "returns a tagged Failure on an unparseable GA (nothing persisted)" do
+      result = described_class.call("ga" => "not-a-ga")
 
       expect(result).to be_failure
-      expect(result.failure).to eq([:invalid, { title: ["is not present"] }])
-      expect(Note.count).to eq(0)
+      expect(result.failure.first).to eq(:validation)
+      expect(result.failure.last).to have_key(:ga)
+      expect(Scan.count).to eq(0)
     end
 
-    it "denies a viewer (authorization)" do
-      viewer = create(:user)
-      create(:membership, user: viewer, account:, role: :viewer)
+    it "treats a hostile array param as unsupplied, not a 500" do
+      result = described_class.call("ga" => "32w0d", "bpd" => ["1"])
 
-      result = described_class.call(account:, author: viewer, params: { title: "x" })
-
-      expect(result).to be_failure
-      expect(result.failure.first).to eq(:forbidden)
+      expect(result).to be_failure   # bpd degrades to a validation failure
     end
   end
 end
@@ -541,66 +453,50 @@ end
 
 ### Request specs (every route)
 - Each route's success response (status + body/redirect)
-- **Authorization** — wrong role / unauthenticated → denied or redirected
-- Flash messages for success and failure
-- Validation errors rendered
-- Cross-tenant request → blocked (if multi-tenant)
+- Validation errors re-rendered (the `POST /scans` form re-renders with `422`)
+- Not-found paths — unknown and non-canonical ids (`01`, `0x10`, `08`) → honest
+  `404` (JSON body on `.json`, HTML page elsewhere)
 
 ```ruby
-# spec/requests/notes_spec.rb
+# spec/requests/scans_spec.rb
 require "spec_helper"
 
-RSpec.describe "Notes", type: :request do   # drives App via Rack::Test (def app; App; end)
-  let(:account) { create(:account) }
-  let(:user)    { create(:user) }
-  before do
-    create(:membership, user:, account:, role: :editor)
-    sign_in(user)
-  end
-
-  describe "POST /notes" do
-    it "creates a note and redirects to the list" do
-      post "/notes", note: { title: "Ship it", body: "today" }
+RSpec.describe "Scans", type: :request do   # drives App via Rack::Test (def app = App)
+  describe "POST /scans" do
+    it "creates a scan and redirects to its report" do
+      post "/scans", "ga" => "32w0d", "bpd" => "81", "hc" => "296",
+                     "ac" => "279", "fl" => "61"
 
       expect(last_response.status).to eq(302)
       follow_redirect!
-      expect(last_response.body).to include("Ship it")
+      expect(last_response.status).to eq(200)
     end
 
-    it "re-renders with an error state on invalid input" do
-      post "/notes", note: { title: "" }
+    it "re-renders the form with 422 on invalid input" do
+      post "/scans", "ga" => ""
 
       expect(last_response.status).to eq(422)
-      expect(last_response.body).to include('data-testid="error-state"')
     end
+  end
 
-    it "blocks an unauthenticated request" do
-      clear_cookies   # drop the signed-in session
-      post "/notes", note: { title: "x" }
-
-      expect(last_response.status).to eq(401).or eq(302)
+  describe "GET /scans/:id" do
+    it "404s a non-canonical id" do
+      get "/scans/08"
+      expect(last_response.status).to eq(404)
     end
   end
 end
 ```
 
-### Feature specs (JS-only flows)
-- Tagged `:js`, excluded from the fast run
-- Only for behavior the request/rack-test layer cannot exercise: `public/js/`
-  vanilla-JS interactions, drag-and-drop, payment-provider redirect/return,
-  CSS/visual rendering
-- **Not** for anything a request spec or a rack-test feature spec already covers
+### Feature specs (server-rendered flows)
+- Capybara rack-test driver, no JS (there is no client JS beyond the theme
+  toggle, so there are no `:js` specs)
+- Drive a real multi-page flow through `data-testid` selectors — e.g. save a
+  scan, read its report, navigate to the catalog
 
-### Job specs (only if Sidekiq is adopted)
-- Happy-path processing
-- Idempotency (run twice → same result)
-- Error handling (malformed payload, missing record)
-
-### Tenant / per-user isolation
-
-Not applicable: this app is single-tenant with no accounts. If accounts are
-ever added, restore the isolation pattern (account-scoped datasets asserted
-never to return another account's row) before shipping them.
+### Job specs (only if Sidekiq is ever adopted)
+- Happy-path processing, idempotency (run twice → same result), error handling
+  (malformed payload, missing record). None apply today — the app ships no jobs.
 
 ## 9. CI Gates
 
@@ -618,10 +514,9 @@ bundle exec erb_lint --lint-all           # ERB lint (optional)
 | Gate           | Gem / tool                                                              | Scope     | Maturity   |
 |----------------|-------------------------------------------------------------------------|-----------|------------|
 | Tests          | [rspec](https://rspec.info/) `~> 3.13`                                   | Sinatra   | [stable]   |
-| Rack integration | [rack-test](https://github.com/rack/rack-test) `~> 2.1`               | Sinatra   | [stable]   |
+| Rack integration | [rack-test](https://github.com/rack/rack-test) `~> 2.2`               | Sinatra   | [stable]   |
 | Feature / E2E  | [capybara](https://github.com/teamcapybara/capybara) `~> 3.40`          | Sinatra   | [stable]   |
-| Factories      | [factory_bot](https://github.com/thoughtbot/factory_bot) `~> 6.4`       | Sinatra   | [stable]   |
-| HTTP stub      | [webmock](https://github.com/bblimke/webmock) `~> 3.23` / [vcr](https://github.com/vcr/vcr) `~> 6.3` | Sinatra | [stable] |
+| Factories      | [factory_bot](https://github.com/thoughtbot/factory_bot) `~> 6.5`       | Sinatra   | [stable]   |
 | Lint/style     | [rubocop](https://github.com/rubocop/rubocop) `~> 1.65`                 | Sinatra   | [stable]   |
 | CVE audit      | [bundler-audit](https://github.com/rubysec/bundler-audit) `~> 0.9`      | Sinatra   | [stable]   |
 | ERB lint       | [erb_lint](https://github.com/Shopify/erb_lint) `~> 0.5`                | template  | [optional] |

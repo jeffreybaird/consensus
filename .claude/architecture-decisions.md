@@ -24,6 +24,15 @@ later. Follow them in all new code.
 | Job tenant id | Sidekiq job arg (only if a job system is added) |
 | Data export | single tenant-scoped service object |
 
+> **What's live vs. deferred in this app.** Sections **1 (Results)** and **4
+> (Pagination)** are implemented and match the code. **Audit logging (§2)** and
+> **soft delete (§3)** are conscious **V1 deferrals** (CLAUDE.md's *Deliberate V1
+> deviations*) — no `audit_logs` table, no `deleted_at`, no delete path. **Side
+> effects/jobs (§5, §9)**, **idempotency (§6)**, and **feature flags (§7)** are
+> patterns for when the triggering feature (external mutation, background work,
+> rollout) arrives — none are wired today. Each such section carries its own
+> status note. The rules bind **in full** the moment their trigger appears.
+
 ---
 
 ## 1. Result / Tagged-Error Pattern
@@ -174,6 +183,13 @@ end
 
 ## 2. Audit Logging on Every Mutation
 
+> **V1 status — deferred (not wired today).** This app has **no `audit_logs`
+> table**: its only mutation is "save a scan" of synthetic data, so auditing is
+> consciously deferred — see CLAUDE.md's *Deliberate V1 deviations*. The pattern
+> below is the target and binds **in full** the moment a second mutation, a
+> destructive action, or anything resembling real data arrives. Do not add such a
+> feature without it.
+
 Every create / update / delete writes one audit row: **who, when, what changed,
 from where**. No exceptions. Rows go in an `audit_logs` table — there is no
 `audited`/`paper_trail` gem; the service writes the row itself.
@@ -259,6 +275,11 @@ Consensus::Audit.record("note.created", resource: note, actor: actor)
 ---
 
 ## 3. Soft Deletes on User-Facing Records
+
+> **V1 status — deferred (not wired today).** There is **no `deleted_at` column
+> and no delete path at all** in this app — a saved scan is never deleted. Soft
+> delete is consciously deferred (CLAUDE.md's *Deliberate V1 deviations*) and
+> binds the instant any user-facing delete, or real data, is introduced.
 
 Never hard-delete a record a user expects to recover or that other records
 reference. Use a `deleted_at` timestamp; filter it out by default; provide an
@@ -434,6 +455,11 @@ open for everyone (`.claude/database.md`).
 
 ## 6. Idempotency Keys on External Mutations
 
+> **Not implemented — pattern for when it's needed.** This app makes **no
+> external mutations** (the `biometry` gem is in-process; nothing is charged,
+> sent, or provisioned), so there is no `idempotency_keys` table. This section
+> binds only once a third-party mutation is added.
+
 Every call that mutates state in a third party (charge, send, provision) carries an
 idempotency key so a retry never double-applies. The key is **deterministic**,
 derived from the operation — **never random** (a random key defeats the purpose on
@@ -485,6 +511,10 @@ index is cheap on SQLite, and the single-writer model serializes the insert natu
 ---
 
 ## 7. Feature Flags
+
+> **Not implemented — pattern for when it's needed.** No `flags` table exists
+> today; this app has no plan tiers or rollouts to gate. Reach for this when the
+> first flag is genuinely needed.
 
 Gate plan-tier features and rollouts behind a **`flags` table**, enabled per actor,
 account, or percentage — not by sprinkling `if account.plan == "pro"` through the

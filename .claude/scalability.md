@@ -8,11 +8,34 @@ users.
 We don't need to handle that load today. We need to make decisions today that
 don't prevent us from handling it later.
 
-> **Baseline:** Ruby 3.3+ · modular Sinatra (`class App < Sinatra::Base`, Puma) ·
-> Sequel ORM · **SQLite** (WAL journal mode, `busy_timeout` set, replicated to S3
-> by Litestream). Redis for cache / buffers / pub-sub. Sidekiq only when durable
-> async is needed. Domain logic in service objects; request context via a
-> `Current` module.
+> ## ⚠️ Status: mostly a TARGET-STATE blueprint
+>
+> Most of this file describes infrastructure the app **does not yet have**. As of
+> today there is **no Redis and no Sidekiq** (neither gem is in the `Gemfile`), and
+> none of these files exist: `app/cache.rb`, `app/buffer.rb`, `config/sidekiq.yml`,
+> `config/rack_attack.rb`. There are no background jobs, no SSE, and no rate
+> limiting. The app has no accounts or users, so the `Current.account`-scoped and
+> tenant-isolation examples are seams, not live code.
+>
+> **What is actually live and binding today:**
+> - **Respect the single writer** (§1, §2) — SQLite serializes writes; keep
+>   transactions short and never do high-frequency row-by-row writes.
+> - **Index hot-path queries** and **paginate/eager-load** lists (§3, §4) — the
+>   `Scan` model already paginates.
+> - **Cache = memoize per request.** There is no shared cache; "put it in Redis"
+>   is a *when-you-add-Redis* instruction, not a description of this codebase.
+>
+> Everything mentioning `Consensus.redis`, `Consensus::Cache`, `Consensus::Buffer`,
+> Sidekiq, or Rack::Attack is a **pattern to build when the need arrives**, kept
+> here so the decision is already made. Read it as "here is how you would add it,"
+> never as "here is what runs."
+
+> **Baseline (target):** Ruby 3.3+ · modular Sinatra (`class App < Sinatra::Base`,
+> Puma) · Sequel ORM · **SQLite** (WAL journal mode, `busy_timeout` set, replicated
+> to S3 by Litestream) — all live today. Redis (cache / buffers / pub-sub) and
+> Sidekiq (durable async) are **not present**; introduce them only when a real need
+> outgrows the single-writer + per-request-memoization defaults. Domain logic in
+> service objects; request context via a `Current` module.
 
 **Maturity tags** used below: `[Template default]` ships in the Sinatra scaffold ·
 `[Stable]` mature, widely-run gem · `[Optional]` reach for it only when you
@@ -108,14 +131,16 @@ events (play, pause, seek, complete), heartbeat pings, view/like counters.
 | **Counters in Redis** | Monotonic counts (views, likes, plays) | `INCR`/`HINCRBY` in Redis; a periodic job reconciles to SQLite |
 | **Bulk insert** | You already hold N rows in memory | Sequel `dataset.multi_insert(rows)` — one short write transaction, one lock |
 
-### Provide a buffer abstraction
+### Provide a buffer abstraction (when you first need one)
 
-Callers never know whether a write was buffered or direct — same interface. The
-default impl is Redis-backed; the interface lets you swap to an in-process buffer
-(single Puma worker) or a stream store later without touching callers.
+There is no buffer in the app today — add one the moment a high-frequency write
+appears. Callers never know whether a write was buffered or direct — same
+interface. A Redis-backed impl is the shared-state default; the interface lets you
+swap to an in-process buffer (single Puma worker) or a stream store later without
+touching callers.
 
 ```ruby
-# app/buffer.rb — one queue method, one flush method.
+# app/buffer.rb (to add) — one queue method, one flush method.
 module Consensus
   module Buffer
     def write(key, value); raise NotImplementedError; end  # enqueue, return :ok
@@ -345,11 +370,13 @@ page.pagination_record_count  # total, for the pager
 
 ## 5. Caching: The Layer Between Users and SQLite
 
-Data read on every page load but written only on an admin edit must be cached —
-and with SQLite this is your **primary** read-scaling lever (there's no replica to
-offload to, §2). There is **no `Rails.cache` and no Solid Cache here.** Caching is
-a small explicit wrapper over Redis (`app/cache.rb`); if you don't cache, you
-memoize per request.
+Data read on every page load but written only on an admin edit should be cached —
+and with SQLite a shared cache is your **primary** read-scaling lever (there's no
+replica to offload to, §2). There is **no `Rails.cache` and no Solid Cache here** —
+and, today, **no shared cache at all**: the app memoizes per request and nothing
+more. When a real need appears, add a small explicit wrapper over Redis
+(`app/cache.rb`, shown below). Until then, "cache it" means "memoize it for the
+duration of the request."
 
 | Cache | Examples | Strategy |
 |---|---|---|
@@ -359,7 +386,7 @@ memoize per request.
 ### The cache wrapper
 
 ```ruby
-# app/cache.rb — the only cache abstraction in this stack. [Stable] redis ~> 5.0
+# app/cache.rb (to add) — the cache abstraction to reach for. [Stable] redis ~> 5.0
 module Consensus
   module Cache
     def self.fetch(key, ttl: 300)

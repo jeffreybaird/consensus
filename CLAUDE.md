@@ -31,8 +31,8 @@ built in, the honest answer is "plain Ruby + an explicit `require`", not a Rails
 - `.claude/scalability.md` — write buffers, caching, jobs by criticality, SSE, rate limiting — all under the SQLite single-writer constraint
 - `.claude/deployment.md` — the push-button-deploy pipeline: Docker + Puma, Caddy TLS, blue/green swap, the `rake db:migrate` gate, secrets/ENV
 - `.claude/theming.md` — CSS-variable tokens + optional per-tenant theming
-- `.claude/design-system.md` — **template**: document your visual design tokens and tone
-- `.claude/frontend-map.md` — **template**: map your routes, services, ERB views, JS modules
+- `.claude/design-system.md` — the visual design tokens and tone (filled in for Consensus)
+- `.claude/frontend-map.md` — the route → service → ERB view → JS map (filled in for Consensus)
 - `.claude/a11y-audit.md` — WCAG 2.1 AA accessibility audit command
 
 Deliberately absent: multi-tenancy, authentication/RBAC, payments, object storage and

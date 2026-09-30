@@ -1,14 +1,17 @@
 # Theming
 
-> CSS-variable theming is universal; per-tenant theme loading is optional (include if multi-brand/multi-tenant).
+> Consensus is **single-brand and single-tenant.** CSS-variable tokens are the
+> customization point; the per-tenant theme-loading described as optional here is
+> **not wired** — there is no `Theme` model or table. See "Per-tenant theming —
+> removed" below.
 
 Load this file when working on visual customization, template/layout selection, or branding configuration.
 
 See also: `.claude/design-system.md` for token conventions, `.claude/database.md` for Sequel migrations and the single-writer SQLite constraint.
 
-> **Baseline:** Plain CSS served as a static file from `public/css/app.css` · CSS custom properties for tokens · ERB partials for reusable components · ERB templates rendered by modular Sinatra (`class App < Sinatra::Base`). Tokens are CSS variables — overridable per tenant. No asset pipeline, no ViewComponent.
+> **Baseline:** Plain CSS served as a static file from `public/css/app.css` · CSS custom properties for tokens · ERB partials for reusable components · ERB templates rendered by modular Sinatra (`class App < Sinatra::Base`). Tokens are CSS variables in one `:root` block. No asset pipeline, no ViewComponent.
 
-**Maturity tags:** **[core]** apply to every project · **[recommended]** strong default, skip only with reason · **[optional]** include only if the app needs it (e.g. multi-tenant / multi-brand).
+**Maturity tags:** **[core]** apply to every project · **[recommended]** strong default, skip only with reason · **[optional]** include only if the app needs it (would apply if this app ever became multi-tenant / multi-brand — it is not today).
 
 ---
 
@@ -16,10 +19,10 @@ See also: `.claude/design-system.md` for token conventions, `.claude/database.md
 
 Theming is **CSS custom properties** set from a stored theme configuration. Templates and partials consume those variables; they never hold hardcoded colors, fonts, or radii.
 
-This gives you **one CSS file for every brand**. The only thing that changes per brand or tenant is the `:root` / `[data-theme]` variable block injected into the layout. No rebuild, no per-tenant stylesheet — `public/css/app.css` is served directly as a static file.
+This gives you **one CSS file for every brand**. The only thing that changes per brand is the `:root` / `[data-theme]` variable block in the layout. No rebuild, no per-tenant stylesheet — `public/css/app.css` is served directly as a static file.
 
-- **Single-brand apps:** write the variable block once, statically, in the base token layer at the top of `public/css/app.css` (see `.claude/design-system.md`).
-- **Multi-brand / multi-tenant apps:** load values from a stored `Theme` row per tenant and server-render them into the layout at request time.
+- **This app (single-brand):** the variable block is written once, statically, in the base token layer at the top of `public/css/app.css` (see `.claude/design-system.md`). This is what is wired today.
+- **If it ever went multi-tenant:** you would load values from a stored `Theme` row per tenant and server-render them into the layout at request time. No such model or table exists here — this bullet is a pointer, not a description of the app.
 
 ```erb
 <%# ✅ component reads variables — re-brands for free %>

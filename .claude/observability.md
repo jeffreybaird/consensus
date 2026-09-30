@@ -1,10 +1,26 @@
 # Observability
 
-Load this file when writing service objects, external API client classes,
-routes, or Rack middleware. Traces and metrics are first-class citizens — every
-operation that matters to the business must be observable.
+Load this file when adding telemetry to service objects, routes, or Rack
+middleware. It is the **blueprint for an observability stack this app does not
+yet have** — read it as "here is how to instrument Consensus when the need
+arrives," not a description of what runs today.
 
-> **Baseline:** Ruby 3.3+ · modular Sinatra (`class App < Sinatra::Base`) on Puma · OpenTelemetry Ruby SDK + `opentelemetry-instrumentation-all` (Rack/Sinatra/Faraday/Sequel) · a tiny `Instrument` event bus · structured JSON logs (`ougai` or a custom formatter). Auto-instrument HTTP / DB / HTTP-clients; reserve manual spans for business logic. **Sequel span coverage is the shakiest link — verify it, or fall back to manual DB spans (see `.claude/database.md`).**
+> ## ⚠️ Status: TARGET STATE — not wired yet
+>
+> **What exists today** is one line — `enable :logging` in `app.rb` (Sinatra/Rack
+> `CommonLogger`, a plaintext access log) — plus `Current.request_id`, set in the
+> `before` filter but **not yet fed into any log line**. That is the whole of it.
+>
+> **What does NOT exist yet** (everything below describes it as a target):
+> OpenTelemetry (no `opentelemetry-*` gems, no `config/otel.rb`), the `Instrument`
+> event bus, a structured JSON logger (`ougai`), and the `Metrics` adapter. The app
+> has no accounts or users, so `Current.account`/`Current.user` and the
+> tenant-scoped span/log examples are seams, not live code. There are no external
+> HTTP calls — the `biometry` gem is in-process — so the Faraday-client examples
+> are illustrative only. Treat every present-tense sentence below as "how it should
+> work once built."
+
+> **Baseline (target):** Ruby 3.3+ · modular Sinatra (`class App < Sinatra::Base`) on Puma · OpenTelemetry Ruby SDK + `opentelemetry-instrumentation-all` (Rack/Sinatra/Sequel) · a tiny `Instrument` event bus · structured JSON logs (`ougai` or a custom formatter). Auto-instrument HTTP / DB; reserve manual spans for business logic. **Sequel span coverage is the shakiest link — verify it, or fall back to manual DB spans (see `.claude/database.md`).**
 
 Replace `Consensus` / `consensus` with your real app name. The Sinatra base class is a
 fixed `App`; services and models live in bare namespaces (`Notes::Create`,
