@@ -17,70 +17,16 @@ The Sinatra base class is always `App` (a fixed name), booted by `run App` in
 
 ---
 
-## 1. Tests Are a Contract, Not an Obstacle
+## 1. Tests Are a Contract
 
-Existing tests describe **intended behavior**. They are specifications, not
-suggestions. These rules are absolute:
+Follow [the canonical project test-contract rules](../.docs/project-guidance.md#tests-are-a-contract).
+They apply to both platforms, including authorized behavior changes and bug fixes.
 
-1. **Never modify an existing test to make it pass.** A previously-passing test
-   that fails after your change means your change broke intended behavior. Fix
-   the code, not the test. Only exception: a deliberate, explicitly-stated
-   behavior change.
-2. **Never weaken an assertion** to pass a failing test.
-3. **Never delete a test to resolve a failure** — flag it for discussion.
-4. **Never change existing function behavior to satisfy a new test** — add a new
-   method/parameter instead.
-5. **A new feature that breaks existing tests** carries the burden of proof —
-   integrate without breaking existing behavior.
-6. **If you believe a test is genuinely wrong**, flag it with a comment and ask
-   before changing.
-7. **Given a bug report**, write a failing test for the expected behavior first,
-   then fix the code.
-8. **Find the root cause** — don't take the shortest route around an error
-   message.
-
-The suite is a ratchet: it only moves forward.
-
----
-
-## 1a. Who Writes Tests — Agent Roles (hook-enforced)
-
-The contract above is not just discipline; it is enforced by hooks (see
-`.claude/settings.json`), the same setup as the biometry gem's repo:
-
-- **`spec-writer`** (`.claude/agents/spec-writer.md`) **owns every file under
-  `spec/`.** It decomposes a requirement into failing unit / integration /
-  acceptance specs *before* implementation, matching the conventions already in
-  the suite, asserting on observable behavior only — never internal call order
-  or private names. It reports the files written and an ordering plan of
-  slices.
-- **`implementer`** implements one slice against pre-written failing specs, one
-  failure at a time, never touching a spec file or shared code outside its
-  slice.
-- **`test-runner`** runs the suite (or one spec) and reports failures verbatim —
-  no interpretation, no fixes.
-- **`reviewer`** reviews the finished diff after green: error paths, boundaries,
-  consistency with the codebase — green tests are the floor, not the finding.
-- **`Explore`** is the read-only search agent.
-
-Enforcement:
-
-- **`scripts/protect-tests.sh`** (PreToolUse hook): any agent other than
-  `spec-writer` is blocked from writing/editing anything matching
-  `spec/`, `_spec.rb` or `_test.rb`, including via shell redirection, `sed -i`,
-  `cp`/`mv`, or inline interpreters (`ruby -e`, `python3 -c`). The main
-  assistant is "everyone else": it delegates spec work to `spec-writer` and
-  reports spec problems instead of editing them. Escape hatch for a human:
-  `ALLOW_TEST_EDITS=1` in the environment.
-- **`scripts/gate.sh`** (TaskCompleted hook): a task cannot complete while
-  `bundle exec rspec` is red. The last 20 lines of the failing run are echoed.
-
-The workflow for any feature is therefore: `spec-writer` writes failing specs →
-implementation makes them pass (directly or via `implementer` slices) →
-`test-runner` confirms → `reviewer` reads the diff. A spec that seems wrong is
-*flagged to spec-writer*, never edited around.
-
----
+See [the shared workflow](../.docs/agent-workflow.md) for current role names,
+direct-edit enforcement, shell auditing, and their limits. Test writers assert
+on observable public behavior, not private names or internal call order. The
+runner reports failures verbatim; the reviewer accepts tests before implementation
+and independently reviews the final result.
 
 ## 2. Test Layout
 
@@ -501,13 +447,15 @@ end
 ## 9. CI Gates
 
 All must pass before merge/deploy. Run the fast suite locally before every
-commit.
+commit. First run `bundle exec rubocop --autocorrect` locally, with corrections
+performed by the role that owns each file. The CI lint command below remains
+read-only; stop for unresolved offenses after safe autocorrection.
 
 ```bash
 bundle exec rspec --tag ~js               # fast: unit + request + rack-test feature specs
 bundle exec rspec --tag js                # browser specs (separate CI job; needs Chrome)
 bundle exec rubocop                       # style + lint (add rubocop-sequel, rubocop-rspec)
-bundle exec bundler-audit check --update  # dependency CVE scan
+bundle exec bundle-audit check --update  # dependency CVE scan
 bundle exec erb_lint --lint-all           # ERB lint (optional)
 ```
 
