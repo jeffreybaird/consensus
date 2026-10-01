@@ -26,6 +26,9 @@ GEM
     ast (2.4.3)
     base64 (0.3.0)
     bigdecimal (4.1.2)
+    bundler-audit (0.9.3)
+      bundler (>= 1.2.0)
+      thor (~> 1.0)
     capybara (3.40.0)
       addressable
       matrix
@@ -87,7 +90,7 @@ GEM
       racc
     prism (1.9.0)
     public_suffix (7.0.5)
-    puma (6.6.1)
+    puma (7.2.1)
       nio4r (~> 2.0)
     racc (1.8.1)
     rack (3.2.7)
@@ -151,6 +154,7 @@ GEM
     sqlite3 (2.9.6-x86_64-darwin)
     sqlite3 (2.9.6-x86_64-linux-gnu)
     sqlite3 (2.9.6-x86_64-linux-musl)
+    thor (1.5.0)
     tilt (2.8.0)
     tzinfo (2.0.6)
       concurrent-ruby (~> 1.0)
@@ -174,12 +178,13 @@ PLATFORMS
 
 DEPENDENCIES
   biometry!
+  bundler-audit (~> 0.9)
   capybara (~> 3.40)
   dotenv (~> 3.1)
   dry-monads (~> 1.8)
   erubi (~> 1.13)
   factory_bot (~> 6.5)
-  puma (~> 6.6)
+  puma (~> 7.2.1)
   rack-test (~> 2.2)
   rackup (~> 2.2)
   rake (~> 13.2)

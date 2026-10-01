@@ -10,7 +10,7 @@ gem "sinatra", "~> 4.1", require: "sinatra/base" # modular app, no classic DSL
 # erubi: ERB engine WITH escape_html support — without it Tilt falls back to
 # un-escaping ERB and `set :erb, escape_html: true` is inert.
 gem "erubi", "~> 1.13"
-gem "puma", "~> 6.6" # app server (config/puma.rb)
+gem "puma", "~> 7.2.1" # app server (config/puma.rb)
 gem "rackup", "~> 2.2" # `run App` entrypoint (config.ru)
 gem "sequel", "~> 5.90" # ORM + migrations
 gem "sqlite3", "~> 2.6" # the only DB backend
@@ -21,6 +21,7 @@ gem "dry-monads", "~> 1.8", require: "dry/monads" # Success/Failure Results
 gem "biometry", path: "vendor/biometry"
 
 group :development, :test do
+  gem "bundler-audit", "~> 0.9", require: false
   gem "rspec", "~> 3.13"
   gem "rack-test", "~> 2.2", require: "rack/test"
   gem "factory_bot", "~> 6.5"
